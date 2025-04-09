@@ -2,8 +2,19 @@
 
 import * as cheerio from "cheerio"
 
+// Add this interface to define image metadata
+export interface ImageMetadata {
+  url: string;
+  width?: number;
+  height?: number;
+  size?: 'small' | 'medium' | 'large' | 'unknown';
+  estimatedFileSize?: string;
+  filename: string;
+}
+
 export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
   const logs: string[] = []
+  const imageMetadata: ImageMetadata[] = []
 
   try {
     logs.push(`Starting to fetch URL: ${url}`)
@@ -122,8 +133,18 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
       return { error: "No images found on the page", logs }
     }
 
+    // Create metadata for each image
+    imageUrls.forEach((url, index) => {
+      const filename = url.split("/").pop()?.split("?")[0] || `image-${index + 1}`
+      imageMetadata.push({
+        url,
+        size: 'unknown', // Will be determined client-side after loading
+        filename
+      })
+    })
+
     logs.push(`Found ${imageUrls.length} unique images`)
-    return { imageUrls, logs }
+    return { imageUrls, imageMetadata, logs }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     logs.push(`Error in fetchImagesFromUrl: ${errorMessage}`)

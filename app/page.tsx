@@ -16,6 +16,17 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Toggle } from "@/components/ui/toggle"
 import JSZip from "jszip"
+import { Check, ChevronDown, Filter } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ImageMetadata } from "./actions"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const isBrowser = typeof window !== 'undefined'
 
@@ -39,15 +50,38 @@ export default function ImageProcessor() {
   const htmlCanvasRef = useRef<HTMLCanvasElement>(null)
   const [fetchedImages, setFetchedImages] = useState<string[]>([])
   const [selectedImages, setSelectedImages] = useState<string[]>([])
-  const [imageMetadata, setImageMetadata] = useState<Record<string, { filename: string; estimatedSize?: string }>>({})
+  const [imageMetadata, setImageMetadata] = useState<ImageMetadata[]>([])
+  const [sizeFilter, setSizeFilter] = useState<('small' | 'medium' | 'large' | 'unknown')[]>(['small', 'medium', 'large', 'unknown'])
+  const [filteredImages, setFilteredImages] = useState<string[]>([])
   const [showLogs, setShowLogs] = useState(false)
+  const [minWidth, setMinWidth] = useState<number | undefined>(undefined)
+  const [minHeight, setMinHeight] = useState<number | undefined>(undefined)
+  const [customSizeEnabled, setCustomSizeEnabled] = useState(false)
 
-  // Auto-scroll logs to bottom
+  // Add this effect to update filtered images when size filter changes
   useEffect(() => {
-    if (logsRef.current) {
-      logsRef.current.scrollTop = logsRef.current.scrollHeight
+    if (fetchedImages.length > 0 && imageMetadata.length > 0) {
+      const filtered = imageMetadata
+        .filter(img => {
+          // Filter by predefined sizes
+          const matchesPresetSize = sizeFilter.includes(img.size || 'unknown');
+          
+          // Filter by custom dimensions if enabled
+          const matchesCustomSize = customSizeEnabled ? 
+            (!minWidth || (img.width && img.width >= minWidth)) && 
+            (!minHeight || (img.height && img.height >= minHeight)) : 
+            true;
+          
+          return matchesPresetSize || (customSizeEnabled && matchesCustomSize);
+        })
+        .map(img => img.url)
+      
+      setFilteredImages(filtered)
+      addLog(`Filtered to ${filtered.length} images based on size criteria`)
+    } else {
+      setFilteredImages(fetchedImages)
     }
-  }, [logs])
+  }, [fetchedImages, imageMetadata, sizeFilter, minWidth, minHeight, customSizeEnabled])
 
   // Process images when imageUrls change
   useEffect(() => {
@@ -69,8 +103,9 @@ export default function ImageProcessor() {
     setProcessedImages([])
     setLogs([])
     setFetchedImages([])
+    setFilteredImages([])
     setSelectedImages([])
-    setImageMetadata({})
+    setImageMetadata([])
     addLog(`Fetching images from URL: ${url}`)
 
     if (useCustomBaseUrl && baseUrl) {
@@ -89,17 +124,20 @@ export default function ImageProcessor() {
         addLog(`Error: ${result.error}`)
       } else if (result.imageUrls) {
         addLog(`Found ${result.imageUrls.length} images on the page`)
-
-        // Create metadata for each image
-        const metadata: Record<string, { filename: string; estimatedSize?: string }> = {}
-        result.imageUrls.forEach((imgUrl, index) => {
+        
+        // Store initial metadata
+        const metadata = result.imageMetadata || result.imageUrls.map((imgUrl, index) => {
           const filename = imgUrl.split("/").pop()?.split("?")[0] || `image-${index + 1}`
-          metadata[imgUrl] = { filename }
-          addLog(`Image ${index + 1}: ${imgUrl} (${filename})`)
+          return { url: imgUrl, filename, size: 'unknown' as const }
         })
-
+        
         setImageMetadata(metadata)
         setFetchedImages(result.imageUrls)
+        setFilteredImages(result.imageUrls)
+        
+        // Load images to determine their sizes
+        addLog("Loading images to determine sizes...")
+        loadImageSizes(result.imageUrls)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
@@ -778,21 +816,92 @@ export default function ImageProcessor() {
   }
 
   const selectAllImages = () => {
-    if (fetchedImages.length === 0) return
+    if (filteredImages.length === 0) return
 
-    if (selectedImages.length === fetchedImages.length) {
-      // If all are selected, deselect all
+    if (selectedImages.length === filteredImages.length) {
+      // If all filtered images are selected, deselect all
       setSelectedImages([])
       addLog("Deselected all images")
     } else {
-      // Otherwise select all
-      setSelectedImages([...fetchedImages])
-      addLog(`Selected all ${fetchedImages.length} images`)
+      // Otherwise select all filtered images
+      setSelectedImages([...filteredImages])
+      addLog(`Selected all ${filteredImages.length} filtered images`)
     }
   }
 
   const toggleLogs = () => {
     setShowLogs(prev => !prev)
+  }
+
+  // Add this function to determine image size category
+  const determineImageSize = (width?: number, height?: number): 'small' | 'medium' | 'large' | 'unknown' => {
+    if (!width || !height) return 'unknown'
+    
+    const area = width * height
+    
+    if (area < 90000) { // Less than 300x300
+      return 'small'
+    } else if (area < 360000) { // Less than 600x600
+      return 'medium'
+    } else {
+      return 'large'
+    }
+  }
+
+  // Add this function to load image sizes
+  const loadImageSizes = (urls: string[]) => {
+    let loaded = 0
+    
+    urls.forEach((url, index) => {
+      const img = new Image()
+      img.onload = () => {
+        loaded++
+        setImageMetadata(prev => {
+          const updated = [...prev]
+          const size = determineImageSize(img.width, img.height)
+          
+          if (updated[index]) {
+            updated[index] = {
+              ...updated[index],
+              width: img.width,
+              height: img.height,
+              size
+            }
+          }
+          
+          if (loaded === urls.length) {
+            const counts = {
+              small: updated.filter(m => m.size === 'small').length,
+              medium: updated.filter(m => m.size === 'medium').length,
+              large: updated.filter(m => m.size === 'large').length,
+              unknown: updated.filter(m => m.size === 'unknown').length
+            }
+            
+            addLog(`Image sizes: ${counts.small} small, ${counts.medium} medium, ${counts.large} large, ${counts.unknown} unknown`)
+          }
+          
+          return updated
+        })
+      }
+      
+      img.onerror = () => {
+        loaded++
+        // Keep as unknown size
+      }
+      
+      img.src = getProxiedImageUrl(url)
+    })
+  }
+
+  // Add this function to toggle size filter
+  const toggleSizeFilter = (size: 'small' | 'medium' | 'large' | 'unknown') => {
+    setSizeFilter(prev => {
+      if (prev.includes(size)) {
+        return prev.filter(s => s !== size)
+      } else {
+        return [...prev, size]
+      }
+    })
   }
 
   return (
@@ -995,9 +1104,83 @@ export default function ImageProcessor() {
                 <div className="mt-6 space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-medium">Found Images ({fetchedImages.length})</h3>
-                    <div className="space-x-2">
+                    <div className="flex space-x-2 items-center">
+                      {/* Add Size Filter Dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="flex items-center gap-1">
+                            <Filter className="h-4 w-4" />
+                            Size
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>Filter by Size</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={sizeFilter.includes('small')}
+                            onCheckedChange={() => toggleSizeFilter('small')}
+                          >
+                            Small ({imageMetadata.filter(m => m.size === 'small').length})
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuCheckboxItem
+                            checked={sizeFilter.includes('medium')}
+                            onCheckedChange={() => toggleSizeFilter('medium')}
+                          >
+                            Medium ({imageMetadata.filter(m => m.size === 'medium').length})
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuCheckboxItem
+                            checked={sizeFilter.includes('large')}
+                            onCheckedChange={() => toggleSizeFilter('large')}
+                          >
+                            Large ({imageMetadata.filter(m => m.size === 'large').length})
+                          </DropdownMenuCheckboxItem>
+                          
+                          <DropdownMenuSeparator />
+                          <div className="p-2">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="custom-size" 
+                                checked={customSizeEnabled}
+                                onCheckedChange={(checked) => setCustomSizeEnabled(!!checked)}
+                              />
+                              <label htmlFor="custom-size" className="text-sm font-medium">
+                                Custom Size
+                              </label>
+                            </div>
+                            
+                            <div className="mt-2 space-y-2">
+                              <div className="flex items-center space-x-2">
+                                <label htmlFor="min-width" className="text-xs w-20">Min Width:</label>
+                                <Input
+                                  id="min-width"
+                                  type="number"
+                                  placeholder="px"
+                                  className="h-7 text-xs"
+                                  value={minWidth || ''}
+                                  onChange={(e) => setMinWidth(e.target.value ? Number(e.target.value) : undefined)}
+                                  disabled={!customSizeEnabled}
+                                />
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <label htmlFor="min-height" className="text-xs w-20">Min Height:</label>
+                                <Input
+                                  id="min-height"
+                                  type="number"
+                                  placeholder="px"
+                                  className="h-7 text-xs"
+                                  value={minHeight || ''}
+                                  onChange={(e) => setMinHeight(e.target.value ? Number(e.target.value) : undefined)}
+                                  disabled={!customSizeEnabled}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      
                       <Button variant="outline" size="sm" onClick={selectAllImages}>
-                        {selectedImages.length === fetchedImages.length ? "Deselect All" : "Select All"}
+                        {selectedImages.length === filteredImages.length ? "Deselect All" : "Select All"}
                       </Button>
                       <Button onClick={processSelectedImages} disabled={selectedImages.length === 0}>
                         Process Selected ({selectedImages.length})
@@ -1006,7 +1189,8 @@ export default function ImageProcessor() {
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {fetchedImages.map((imgUrl, index) => (
+                    {/* Update to use filteredImages instead of fetchedImages */}
+                    {filteredImages.map((imgUrl, index) => (
                       <div
                         key={index}
                         className={`border rounded-lg overflow-hidden cursor-pointer transition-all ${
@@ -1021,13 +1205,21 @@ export default function ImageProcessor() {
                             alt={`Image ${index + 1}`}
                             className="object-contain w-full h-full"
                             onError={(e) => {
-                              // Replace broken images with placeholder
                               e.currentTarget.src = "/placeholder.svg?height=150&width=150";
                             }}
                           />
+                          {/* Add size badge */}
+                          {imageMetadata.find(m => m.url === imgUrl)?.size && (
+                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+                              {imageMetadata.find(m => m.url === imgUrl)?.size}
+                              {imageMetadata.find(m => m.url === imgUrl)?.width && imageMetadata.find(m => m.url === imgUrl)?.height && 
+                                ` (${imageMetadata.find(m => m.url === imgUrl)?.width}×${imageMetadata.find(m => m.url === imgUrl)?.height})`
+                              }
+                            </div>
+                          )}
                         </div>
                         <div className="p-2 text-xs truncate">
-                          {imageMetadata[imgUrl]?.filename || `Image ${index + 1}`}
+                          {imageMetadata.find(m => m.url === imgUrl)?.filename || imgUrl.split('/').pop() || 'image'}
                         </div>
                       </div>
                     ))}
