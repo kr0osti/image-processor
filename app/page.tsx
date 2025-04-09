@@ -9,21 +9,21 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { fetchImagesFromUrl } from "./actions"
-import { Loader2, Globe, ImageIcon, Upload, AlertTriangle, Info, Download, Trash2 } from "lucide-react"
+import { Loader2, Globe, ImageIcon, Upload, AlertTriangle, Info, Download, Trash2, Filter, ChevronDown } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Toggle } from "@/components/ui/toggle"
 import JSZip from "jszip"
-import { Check, ChevronDown, Filter } from "lucide-react"
+import { Check } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import { ImageMetadata } from "./actions"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -51,7 +51,7 @@ export default function ImageProcessor() {
   const [fetchedImages, setFetchedImages] = useState<string[]>([])
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [imageMetadata, setImageMetadata] = useState<ImageMetadata[]>([])
-  const [sizeFilter, setSizeFilter] = useState<('small' | 'medium' | 'large' | 'unknown')[]>(['small', 'medium', 'large', 'unknown'])
+  const [sizeFilter, setSizeFilter] = useState<('small' | 'medium' | 'large' | 'unknown')[]>(['large'])
   const [filteredImages, setFilteredImages] = useState<string[]>([])
   const [showLogs, setShowLogs] = useState(false)
   const [minWidth, setMinWidth] = useState<number | undefined>(undefined)
@@ -895,13 +895,11 @@ export default function ImageProcessor() {
 
   // Add this function to toggle size filter
   const toggleSizeFilter = (size: 'small' | 'medium' | 'large' | 'unknown') => {
-    setSizeFilter(prev => {
-      if (prev.includes(size)) {
-        return prev.filter(s => s !== size)
-      } else {
-        return [...prev, size]
-      }
-    })
+    setSizeFilter(prev => 
+      prev.includes(size) 
+        ? prev.filter(s => s !== size) 
+        : [...prev, size]
+    )
   }
 
   return (
@@ -1101,6 +1099,19 @@ export default function ImageProcessor() {
               </form>
 
               {fetchedImages.length > 0 && (
+                <div className="mt-4 flex justify-end">
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    onClick={deleteAllFiles}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete All Files
+                  </Button>
+                </div>
+              )}
+
+              {fetchedImages.length > 0 && (
                 <div className="mt-6 space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-medium">Found Images ({fetchedImages.length})</h3>
@@ -1117,26 +1128,46 @@ export default function ImageProcessor() {
                         <DropdownMenuContent align="end" className="w-56">
                           <DropdownMenuLabel>Filter by Size</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuCheckboxItem
-                            checked={sizeFilter.includes('small')}
-                            onCheckedChange={() => toggleSizeFilter('small')}
-                          >
-                            Small ({imageMetadata.filter(m => m.size === 'small').length})
-                          </DropdownMenuCheckboxItem>
-                          <DropdownMenuCheckboxItem
-                            checked={sizeFilter.includes('medium')}
-                            onCheckedChange={() => toggleSizeFilter('medium')}
-                          >
-                            Medium ({imageMetadata.filter(m => m.size === 'medium').length})
-                          </DropdownMenuCheckboxItem>
-                          <DropdownMenuCheckboxItem
-                            checked={sizeFilter.includes('large')}
-                            onCheckedChange={() => toggleSizeFilter('large')}
-                          >
-                            Large ({imageMetadata.filter(m => m.size === 'large').length})
-                          </DropdownMenuCheckboxItem>
+                          
+                          {/* Preset size filters */}
+                          <div className="p-2">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Checkbox 
+                                id="size-small" 
+                                checked={sizeFilter.includes('small')}
+                                onCheckedChange={() => toggleSizeFilter('small')}
+                              />
+                              <label htmlFor="size-small" className="text-sm">
+                                Small ({imageMetadata.filter(m => m.size === 'small').length})
+                              </label>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Checkbox 
+                                id="size-medium" 
+                                checked={sizeFilter.includes('medium')}
+                                onCheckedChange={() => toggleSizeFilter('medium')}
+                              />
+                              <label htmlFor="size-medium" className="text-sm">
+                                Medium ({imageMetadata.filter(m => m.size === 'medium').length})
+                              </label>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="size-large" 
+                                checked={sizeFilter.includes('large')}
+                                onCheckedChange={() => toggleSizeFilter('large')}
+                              />
+                              <label htmlFor="size-large" className="text-sm">
+                                Large ({imageMetadata.filter(m => m.size === 'large').length})
+                              </label>
+                            </div>
+                          </div>
                           
                           <DropdownMenuSeparator />
+                          
+                          {/* Custom size filter */}
                           <div className="p-2">
                             <div className="flex items-center space-x-2">
                               <Checkbox 
@@ -1149,32 +1180,32 @@ export default function ImageProcessor() {
                               </label>
                             </div>
                             
-                            <div className="mt-2 space-y-2">
-                              <div className="flex items-center space-x-2">
-                                <label htmlFor="min-width" className="text-xs w-20">Min Width:</label>
-                                <Input
-                                  id="min-width"
-                                  type="number"
-                                  placeholder="px"
-                                  className="h-7 text-xs"
-                                  value={minWidth || ''}
-                                  onChange={(e) => setMinWidth(e.target.value ? Number(e.target.value) : undefined)}
-                                  disabled={!customSizeEnabled}
-                                />
+                            {customSizeEnabled && (
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <label htmlFor="min-width" className="text-xs w-20">Min Width:</label>
+                                  <Input
+                                    id="min-width"
+                                    type="number"
+                                    placeholder="px"
+                                    className="h-7 text-xs"
+                                    value={minWidth || ''}
+                                    onChange={(e) => setMinWidth(e.target.value ? Number(e.target.value) : undefined)}
+                                  />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <label htmlFor="min-height" className="text-xs w-20">Min Height:</label>
+                                  <Input
+                                    id="min-height"
+                                    type="number"
+                                    placeholder="px"
+                                    className="h-7 text-xs"
+                                    value={minHeight || ''}
+                                    onChange={(e) => setMinHeight(e.target.value ? Number(e.target.value) : undefined)}
+                                  />
+                                </div>
                               </div>
-                              <div className="flex items-center space-x-2">
-                                <label htmlFor="min-height" className="text-xs w-20">Min Height:</label>
-                                <Input
-                                  id="min-height"
-                                  type="number"
-                                  placeholder="px"
-                                  className="h-7 text-xs"
-                                  value={minHeight || ''}
-                                  onChange={(e) => setMinHeight(e.target.value ? Number(e.target.value) : undefined)}
-                                  disabled={!customSizeEnabled}
-                                />
-                              </div>
-                            </div>
+                            )}
                           </div>
                         </DropdownMenuContent>
                       </DropdownMenu>
