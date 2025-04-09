@@ -29,10 +29,15 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_PUBLIC_DEBUG=false
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
 
 # Copy necessary files from builder
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
@@ -44,9 +49,6 @@ USER nextjs
 
 # Expose the port
 EXPOSE 3000
-
-# Set the environment variable for the port
-ENV PORT 3000
 
 # Start the application
 CMD ["node", "server.js"]

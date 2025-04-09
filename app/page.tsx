@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import { useRef, useState, useEffect } from 'react';
+import React from 'react';
+
+// This is fine at module level - it's not a hook
+const isBrowser = typeof window !== 'undefined';
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -25,8 +30,21 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ImageMetadata } from "./actions"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Copy } from "lucide-react"
+import { toast } from "sonner"
 
-const isBrowser = typeof window !== 'undefined'
+interface FetchResult {
+  imageUrls?: string[];
+  imageMetadata?: Array<{
+    url: string;
+    filename: string;
+    size: 'small' | 'medium' | 'large' | 'unknown';
+    width?: number;
+    height?: number;
+  }>;
+  error?: string;
+  logs?: string[];
+}
 
 export default function ImageProcessor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -49,6 +67,51 @@ export default function ImageProcessor() {
   const [minHeight, setMinHeight] = useState<number | undefined>(undefined)
   const [customSizeEnabled, setCustomSizeEnabled] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
+
+  // Add this function to copy image URL to clipboard
+  const copyImageUrl = (dataUrl: string) => {
+    if (!isBrowser) {
+      addLog("Cannot copy URL in server context")
+      return
+    }
+    
+    if (!navigator.clipboard) {
+      // Fallback for browsers that don't support the Clipboard API
+      try {
+        const textArea = document.createElement('textarea')
+        textArea.value = dataUrl
+        textArea.style.position = 'fixed'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        const successful = document.execCommand('copy')
+        document.body.removeChild(textArea)
+        
+        if (successful) {
+          toast.success("Image URL copied to clipboard")
+          addLog("Image URL copied to clipboard (fallback method)")
+        } else {
+          toast.error("Failed to copy URL")
+          addLog("Failed to copy URL (fallback method failed)")
+        }
+      } catch (err) {
+        toast.error("Failed to copy URL")
+        addLog(`Error copying URL: ${err}`)
+      }
+      return
+    }
+    
+    // Modern clipboard API
+    navigator.clipboard.writeText(dataUrl)
+      .then(() => {
+        toast.success("Image URL copied to clipboard")
+        addLog("Image URL copied to clipboard")
+      })
+      .catch(err => {
+        toast.error("Failed to copy URL")
+        addLog(`Error copying URL: ${err}`)
+      })
+  }
 
   // Add this effect to update filtered images when size filter changes
   useEffect(() => {
@@ -108,7 +171,7 @@ export default function ImageProcessor() {
     }
 
     try {
-      const result = await fetchImagesFromUrl(url, useCustomBaseUrl ? baseUrl : undefined)
+      const result = await fetchImagesFromUrl(url, useCustomBaseUrl ? baseUrl : undefined) as FetchResult;
 
       if (result.logs) {
         result.logs.forEach((log) => addLog(log))
@@ -121,10 +184,10 @@ export default function ImageProcessor() {
         addLog(`Found ${result.imageUrls.length} images on the page`)
         
         // Store initial metadata
-        const metadata = result.imageMetadata || result.imageUrls.map((imgUrl, index) => {
+        const metadata = result.imageMetadata || (result.imageUrls ? result.imageUrls.map((imgUrl, index) => {
           const filename = imgUrl.split("/").pop()?.split("?")[0] || `image-${index + 1}`
           return { url: imgUrl, filename, size: 'unknown' as const }
-        })
+        }) : []);
         
         setImageMetadata(metadata)
         setFetchedImages(result.imageUrls)
@@ -153,7 +216,7 @@ export default function ImageProcessor() {
     addLog("Creating placeholder image from HTML tag dimensions")
 
     // Get the canvas
-    const canvas = htmlCanvasRef.current
+    const canvas = canvasRef.current
     if (!canvas) {
       addLog("Canvas reference not available")
       return
@@ -388,6 +451,31 @@ export default function ImageProcessor() {
     }
   }
 
+  // Update the existing convertToRealUrl function:
+  const convertDataUrlToRealUrl = async (dataUrl: string): Promise<string> => {
+    try {
+      const response = await fetch('/api/images', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dataUrl }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to store image: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      addLog(`Generated real URL for image: ${data.url}`);
+      return data.url;
+    } catch (error) {
+      addLog(`Error generating real URL: ${error}`);
+      // Fall back to data URL if conversion fails
+      return dataUrl;
+    }
+  }
+
   const processImages = async (urls: string[]) => {
     setProcessing(true)
     addLog(`Starting to process ${urls.length} images`)
@@ -410,29 +498,13 @@ export default function ImageProcessor() {
         }
 
         if (processedImage) {
-          processed.push(processedImage)
+          // Convert data URL to real URL
+          const realUrl = await convertDataUrlToRealUrl(processedImage)
+          processed.push(realUrl)
           addLog(`Successfully processed image ${index + 1}`)
-        } else {
-          addLog(`Failed to process image ${index + 1} even with placeholder`)
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error"
-        addLog(`Error processing image ${index + 1}: ${errorMessage}`)
-        console.error(`Error processing image ${imageUrl}:`, error)
-
-        // Try to create a placeholder as a fallback
-        try {
-          const placeholderDataUrl = await createPlaceholderForFailedImage(imageUrl)
-          if (placeholderDataUrl) {
-            const processedPlaceholder = await processPlaceholderAsImage(placeholderDataUrl)
-            if (processedPlaceholder) {
-              processed.push(processedPlaceholder)
-              addLog(`Successfully created fallback placeholder for image ${index + 1}`)
-            }
-          }
-        } catch (placeholderError) {
-          addLog(`Failed to create fallback placeholder: ${placeholderError}`)
-        }
+        addLog(`Error processing image ${index + 1}: ${error}`)
       }
     }
 
@@ -1145,7 +1217,12 @@ export default function ImageProcessor() {
           {error && <p className="text-red-500 mt-4">{error}</p>}
 
           {/* Hidden canvas for image processing */}
-          <canvas ref={canvasRef} style={{ display: "none" }} width="1500" height="1500" />
+          <canvas 
+            ref={canvasRef}
+            width={1500}
+            height={1500}
+            style={{ display: 'none' }}
+          />
 
           {/* Logs panel */}
           {/* Removed logs panel section */}
@@ -1187,9 +1264,16 @@ export default function ImageProcessor() {
                     </div>
                     <div className="p-3 flex justify-between items-center">
                       <span className="text-sm text-gray-500">Image {index + 1}</span>
-                      <Button size="sm" onClick={() => downloadImage(img, index + 1)}>
-                        Download
-                      </Button>
+                      <div className="flex space-x-2">
+                        <Button size="sm" variant="outline" onClick={() => copyImageUrl(img)}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy URL
+                        </Button>
+                        <Button size="sm" onClick={() => downloadImage(img, index + 1)}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
