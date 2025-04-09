@@ -27,6 +27,8 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  // Add output configuration for standalone mode
+  output: 'standalone',
 }
 
 if (userConfig) {
@@ -49,3 +51,4 @@ if (userConfig) {
 }
 
 export default nextConfig
+
