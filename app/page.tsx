@@ -1,15 +1,13 @@
-'use client'
+"use client";
 
-import type React from "react"
-
-import { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { fetchImagesFromUrl } from "./actions"
-import { Loader2, Globe, ImageIcon, Upload, AlertTriangle, Info, Download, Trash2, Filter, ChevronDown } from "lucide-react"
+import { Loader2, Globe, Upload, AlertTriangle, Info, Download, Trash2, Filter, ChevronDown } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -31,32 +29,26 @@ import { Checkbox } from "@/components/ui/checkbox"
 const isBrowser = typeof window !== 'undefined'
 
 export default function ImageProcessor() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [url, setUrl] = useState("")
   const [baseUrl, setBaseUrl] = useState("https://zhik.com")
   const [useCustomBaseUrl, setUseCustomBaseUrl] = useState(false)
   const [imageUrls, setImageUrls] = useState<string[]>([])
-  const [directImageUrl, setDirectImageUrl] = useState("")
-  const [directImageHtml, setDirectImageHtml] = useState("")
   const [processedImages, setProcessedImages] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
-  const [logs, setLogs] = useState<string[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
-  const [htmlImageData, setHtmlImageData] = useState<{ width: number; height: number } | null>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const logsRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const htmlCanvasRef = useRef<HTMLCanvasElement>(null)
   const [fetchedImages, setFetchedImages] = useState<string[]>([])
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [imageMetadata, setImageMetadata] = useState<ImageMetadata[]>([])
   const [sizeFilter, setSizeFilter] = useState<('small' | 'medium' | 'large' | 'unknown')[]>(['large'])
   const [filteredImages, setFilteredImages] = useState<string[]>([])
-  const [showLogs, setShowLogs] = useState(false)
   const [minWidth, setMinWidth] = useState<number | undefined>(undefined)
   const [minHeight, setMinHeight] = useState<number | undefined>(undefined)
   const [customSizeEnabled, setCustomSizeEnabled] = useState(false)
+  const [logs, setLogs] = useState<string[]>([])
 
   // Add this effect to update filtered images when size filter changes
   useEffect(() => {
@@ -91,7 +83,10 @@ export default function ImageProcessor() {
   }, [imageUrls])
 
   const addLog = (message: string) => {
-    setLogs((prevLogs) => [...prevLogs, `[${new Date().toLocaleTimeString()}] ${message}`])
+    // Check if DEBUG is enabled
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[${new Date().toLocaleTimeString()}] ${message}`)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -149,41 +144,9 @@ export default function ImageProcessor() {
     }
   }
 
+  // Remove the handleDirectImageSubmit function
   const handleDirectImageSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setProcessedImages([])
-    setLogs([])
-    setHtmlImageData(null)
-
-    if (directImageUrl) {
-      addLog(`Processing direct image URL: ${directImageUrl}`)
-      setImageUrls([directImageUrl])
-    } else if (directImageHtml) {
-      addLog(`Processing HTML image tag`)
-      // Extract information from the HTML
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(directImageHtml, "text/html")
-      const imgElement = doc.querySelector("img")
-
-      if (imgElement) {
-        // Extract dimensions from style, width/height attributes, or default values
-        const width = Number.parseInt(imgElement.getAttribute("width") || "0") || 800
-        const height = Number.parseInt(imgElement.getAttribute("height") || "0") || 1000
-
-        // Store dimensions for later use
-        setHtmlImageData({ width, height })
-        addLog(`Extracted image dimensions: ${width}x${height}`)
-
-        // Create a blank canvas with these dimensions
-        processHtmlImageTag(imgElement, width, height)
-      } else {
-        setError("No img tag found in the HTML")
-        addLog("No img tag found in the HTML")
-      }
-    } else {
-      setError("Please enter an image URL or HTML")
-      addLog("No image URL or HTML provided")
-    }
+    // This entire function can be removed
   }
 
   const processHtmlImageTag = (imgElement: HTMLImageElement, width: number, height: number) => {
@@ -405,8 +368,8 @@ export default function ImageProcessor() {
   }
 
   const triggerFileInput = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click()
+    if (fileInputRef && fileInputRef.current) {
+      fileInputRef.current.click();
     }
   }
 
@@ -776,10 +739,6 @@ export default function ImageProcessor() {
     }
   }
 
-  const clearLogs = () => {
-    setLogs([])
-  }
-
   const deleteAllFiles = () => {
     // Clean up object URLs
     imageUrls.forEach((url) => {
@@ -827,10 +786,6 @@ export default function ImageProcessor() {
       setSelectedImages([...filteredImages])
       addLog(`Selected all ${filteredImages.length} filtered images`)
     }
-  }
-
-  const toggleLogs = () => {
-    setShowLogs(prev => !prev)
   }
 
   // Add this function to determine image size category
@@ -915,10 +870,6 @@ export default function ImageProcessor() {
               <TabsTrigger value="webpage">
                 <Globe className="mr-2 h-4 w-4" />
                 From Webpage
-              </TabsTrigger>
-              <TabsTrigger value="direct">
-                <ImageIcon className="mr-2 h-4 w-4" />
-                Direct Image
               </TabsTrigger>
               <TabsTrigger value="upload">
                 <Upload className="mr-2 h-4 w-4" />
@@ -1139,75 +1090,6 @@ export default function ImageProcessor() {
               )}
             </TabsContent>
 
-            <TabsContent value="direct">
-              <form onSubmit={handleDirectImageSubmit} className="space-y-4">
-                <Alert>
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    Direct image URLs may fail due to CORS restrictions. If you encounter errors, the app will create a
-                    placeholder based on the HTML tag dimensions.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="space-y-2">
-                  <Label htmlFor="direct-url">Direct Image URL</Label>
-                  <Input
-                    id="direct-url"
-                    type="url"
-                    placeholder="https://example.com/image.jpg"
-                    value={directImageUrl}
-                    onChange={(e) => setDirectImageUrl(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <Label htmlFor="image-html" className="mr-2">
-                      Or paste an image HTML tag
-                    </Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-gray-400" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs">
-                            If the image can't be loaded directly, the app will create a placeholder based on the
-                            dimensions in the HTML tag.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                  <Textarea
-                    id="image-html"
-                    placeholder='<img src="/path/to/image.jpg" alt="Description" width="800" height="1000">'
-                    value={directImageHtml}
-                    onChange={(e) => setDirectImageHtml(e.target.value)}
-                    className="min-h-[100px]"
-                  />
-                </div>
-
-                {!directImageUrl && directImageHtml && (
-                  <div className="space-y-2">
-                    <Label htmlFor="base-url-direct">Base URL for relative paths</Label>
-                    <Input
-                      id="base-url-direct"
-                      type="url"
-                      placeholder="https://example.com"
-                      value={baseUrl}
-                      onChange={(e) => setBaseUrl(e.target.value)}
-                    />
-                  </div>
-                )}
-
-                <Button type="submit">Process Image</Button>
-              </form>
-
-              {/* Hidden canvas for HTML tag processing */}
-              <canvas ref={htmlCanvasRef} style={{ display: "none" }} width="800" height="600" />
-            </TabsContent>
-
             <TabsContent value="upload">
               <div className="space-y-4">
                 <Alert>
@@ -1266,42 +1148,7 @@ export default function ImageProcessor() {
           <canvas ref={canvasRef} style={{ display: "none" }} width="1500" height="1500" />
 
           {/* Logs panel */}
-          <div className="mt-6">
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-medium">Logs</h3>
-                <Toggle 
-                  pressed={showLogs} 
-                  onPressedChange={toggleLogs}
-                  aria-label="Toggle logs visibility"
-                  size="sm"
-                >
-                  {showLogs ? "Hide" : "Show"}
-                </Toggle>
-              </div>
-              {showLogs && (
-                <Button variant="outline" size="sm" onClick={clearLogs}>
-                  Clear Logs
-                </Button>
-              )}
-            </div>
-            {showLogs && (
-              <div
-                ref={logsRef}
-                className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md h-[200px] overflow-y-auto font-mono text-xs"
-              >
-                {logs.length > 0 ? (
-                  logs.map((log, i) => (
-                    <div key={i} className="pb-1">
-                      {log}
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-gray-500">No logs yet. Enter a URL to begin.</div>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Removed logs panel section */}
 
           {processing && (
             <div className="flex items-center justify-center mt-6">

@@ -7,17 +7,13 @@ services:
     restart: unless-stopped
     ports:
       - "6060:3000"
-#    volumes:
-#      - next-build-cache:/app/.next
     environment:
       - NODE_ENV=production
       - NODE_OPTIONS="--max-old-space-size=4096"
+      - NEXT_PUBLIC_DEBUG=true  # Set to 'true' to enable debug logging
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-
-#volumes:
-#  next-build-cache:

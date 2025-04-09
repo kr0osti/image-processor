@@ -28,6 +28,7 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV NEXT_PUBLIC_DEBUG=false
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodejs && \
