@@ -48,6 +48,42 @@ docker compose up
 
 The application will be available at http://localhost:3000
 
+### 🎨 Customizing Your Installation
+
+#### Custom Icons and Branding
+
+You can customize the application's icons and branding by:
+
+1. Creating a `custom-icons` directory on your host machine
+2. Adding the following files to that directory:
+   - `favicon.ico` - The website favicon
+   - `icon-16x16.png` - Small icon (16x16 pixels)
+   - `icon-32x32.png` - Medium icon (32x32 pixels)
+   - `icon-192x192.png` - Large icon for PWA (192x192 pixels)
+   - `icon-512x512.png` - Extra large icon for PWA (512x512 pixels)
+   - `icon-maskable-192x192.png` - Maskable icon for Android (192x192 pixels)
+   - `icon-maskable-512x512.png` - Maskable icon for Android (512x512 pixels)
+   - `apple-icon.png` - Icon for Apple devices (180x180 pixels)
+   - `safari-pinned-tab.svg` - SVG icon for Safari pinned tabs
+
+3. Mount this directory in your docker-compose.yaml:
+   ```yaml
+   volumes:
+     - ./custom-icons:/app/public/custom-icons
+   ```
+
+#### Environment Variables
+
+You can customize the application metadata by setting these environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_SITE_NAME` | The name of your site | NextJS Image Processor |
+| `NEXT_PUBLIC_SITE_DESCRIPTION` | Site description | A powerful web application... |
+| `NEXT_PUBLIC_SITE_URL` | Your site's URL | https://yourdomain.com |
+| `NEXT_PUBLIC_SITE_THEME_COLOR` | Theme color (hex) | #000000 |
+| `NEXT_PUBLIC_SITE_BACKGROUND_COLOR` | Background color (hex) | #ffffff |
+
 ### Manual Setup
 
 If you prefer to run the application without Docker:
@@ -119,3 +155,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Tailwind CSS](https://tailwindcss.com/)
 - [JSZip](https://stuk.github.io/jszip/)
 - [Cheerio](https://cheerio.js.org/)
+
+
