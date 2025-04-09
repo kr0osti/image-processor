@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import type React from "react"
 
@@ -9,13 +9,15 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { fetchImagesFromUrl } from "./actions"
-import { Loader2, Globe, ImageIcon, Upload, AlertTriangle, Info, Download } from "lucide-react"
+import { Loader2, Globe, ImageIcon, Upload, AlertTriangle, Info, Download, Trash2 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-// Add JSZip import at the top of the file, after the other imports
+import { Toggle } from "@/components/ui/toggle"
 import JSZip from "jszip"
+
+const isBrowser = typeof window !== 'undefined'
 
 export default function ImageProcessor() {
   const [url, setUrl] = useState("")
@@ -38,6 +40,7 @@ export default function ImageProcessor() {
   const [fetchedImages, setFetchedImages] = useState<string[]>([])
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [imageMetadata, setImageMetadata] = useState<Record<string, { filename: string; estimatedSize?: string }>>({})
+  const [showLogs, setShowLogs] = useState(false)
 
   // Auto-scroll logs to bottom
   useEffect(() => {
@@ -161,7 +164,7 @@ export default function ImageProcessor() {
     canvas.width = width * scale
     canvas.height = height * scale
 
-    const ctx = canvas.getContext("2d")
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) {
       addLog("Failed to get canvas context")
       return
@@ -210,6 +213,8 @@ export default function ImageProcessor() {
   }
 
   const createPlaceholderForFailedImage = (imageUrl: string): Promise<string> => {
+    if (!isBrowser) return Promise.resolve('')
+    
     return new Promise((resolve) => {
       addLog(`Creating placeholder for failed image: ${imageUrl}`)
 
@@ -221,7 +226,7 @@ export default function ImageProcessor() {
       canvas.width = 800
       canvas.height = 1000
 
-      const ctx = canvas.getContext("2d")
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
       if (!ctx) {
         addLog("Failed to get canvas context for placeholder")
         resolve("")
@@ -296,7 +301,7 @@ export default function ImageProcessor() {
     // Set canvas size to 1500x1500
     canvas.width = 1500
     canvas.height = 1500
-    const ctx = canvas.getContext("2d")
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) {
       addLog("Failed to get canvas context")
       return
@@ -446,6 +451,8 @@ export default function ImageProcessor() {
   }
 
   const processPlaceholderAsImage = (dataUrl: string): Promise<string | null> => {
+    if (!isBrowser) return Promise.resolve(null)
+    
     return new Promise((resolve) => {
       const img = new Image()
 
@@ -460,7 +467,7 @@ export default function ImageProcessor() {
         // Set canvas size to 1500x1500
         canvas.width = 1500
         canvas.height = 1500
-        const ctx = canvas.getContext("2d")
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
         if (!ctx) {
           addLog("Failed to get canvas context")
           resolve(null)
@@ -495,6 +502,8 @@ export default function ImageProcessor() {
   }
 
   const processImageWithCanvas = (imageUrl: string): Promise<string | null> => {
+    if (!isBrowser) return Promise.resolve(null)
+    
     return new Promise((resolve) => {
       const img = new Image()
       img.crossOrigin = "anonymous" // Prevent CORS issues
@@ -518,7 +527,7 @@ export default function ImageProcessor() {
         // Set canvas size to 1500x1500
         canvas.width = 1500
         canvas.height = 1500
-        const ctx = canvas.getContext("2d")
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
         if (!ctx) {
           addLog("Failed to get canvas context")
           resolve(null)
@@ -590,7 +599,7 @@ export default function ImageProcessor() {
       const tempCanvas = document.createElement("canvas")
       tempCanvas.width = img.width
       tempCanvas.height = img.height
-      const tempCtx = tempCanvas.getContext("2d")
+      const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true })
       if (!tempCtx) {
         addLog("Failed to get temporary canvas context for border detection")
         return false
@@ -723,6 +732,24 @@ export default function ImageProcessor() {
     setLogs([])
   }
 
+  const deleteAllFiles = () => {
+    // Clean up object URLs
+    imageUrls.forEach((url) => {
+      if (url.startsWith("blob:")) {
+        URL.revokeObjectURL(url)
+      }
+    })
+    
+    // Reset all file-related state
+    setUploadedFiles([])
+    setImageUrls([])
+    setProcessedImages([])
+    setFetchedImages([])
+    setSelectedImages([])
+    
+    addLog("All files deleted")
+  }
+
   const processSelectedImages = () => {
     if (selectedImages.length === 0) {
       setError("Please select at least one image to process")
@@ -752,6 +779,10 @@ export default function ImageProcessor() {
       setSelectedImages([...fetchedImages])
       addLog(`Selected all ${fetchedImages.length} images`)
     }
+  }
+
+  const toggleLogs = () => {
+    setShowLogs(prev => !prev)
   }
 
   return (
@@ -806,7 +837,17 @@ export default function ImageProcessor() {
 
                 {uploadedFiles.length > 0 && (
                   <div className="mt-4">
-                    <p className="text-sm font-medium mb-2">Uploaded files:</p>
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-sm font-medium">Uploaded files:</p>
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={deleteAllFiles}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete All Files
+                      </Button>
+                    </div>
                     <ul className="text-sm text-gray-500 space-y-1">
                       {uploadedFiles.map((file, index) => (
                         <li key={index}>
@@ -994,25 +1035,39 @@ export default function ImageProcessor() {
           {/* Logs panel */}
           <div className="mt-6">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-medium">Logs</h3>
-              <Button variant="outline" size="sm" onClick={clearLogs}>
-                Clear Logs
-              </Button>
-            </div>
-            <div
-              ref={logsRef}
-              className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md h-[200px] overflow-y-auto font-mono text-xs"
-            >
-              {logs.length > 0 ? (
-                logs.map((log, i) => (
-                  <div key={i} className="pb-1">
-                    {log}
-                  </div>
-                ))
-              ) : (
-                <div className="text-gray-500">No logs yet. Enter a URL to begin.</div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-medium">Logs</h3>
+                <Toggle 
+                  pressed={showLogs} 
+                  onPressedChange={toggleLogs}
+                  aria-label="Toggle logs visibility"
+                  size="sm"
+                >
+                  {showLogs ? "Hide" : "Show"}
+                </Toggle>
+              </div>
+              {showLogs && (
+                <Button variant="outline" size="sm" onClick={clearLogs}>
+                  Clear Logs
+                </Button>
               )}
             </div>
+            {showLogs && (
+              <div
+                ref={logsRef}
+                className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md h-[200px] overflow-y-auto font-mono text-xs"
+              >
+                {logs.length > 0 ? (
+                  logs.map((log, i) => (
+                    <div key={i} className="pb-1">
+                      {log}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-gray-500">No logs yet. Enter a URL to begin.</div>
+                )}
+              </div>
+            )}
           </div>
 
           {processing && (
