@@ -910,141 +910,21 @@ export default function ImageProcessor() {
           <CardDescription>Download and process images to 1500x1500px with appropriate positioning</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="upload">
+          <Tabs defaultValue="webpage">
             <TabsList className="mb-4">
-              <TabsTrigger value="upload">
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Images
+              <TabsTrigger value="webpage">
+                <Globe className="mr-2 h-4 w-4" />
+                From Webpage
               </TabsTrigger>
               <TabsTrigger value="direct">
                 <ImageIcon className="mr-2 h-4 w-4" />
                 Direct Image
               </TabsTrigger>
-              <TabsTrigger value="webpage">
-                <Globe className="mr-2 h-4 w-4" />
-                From Webpage
+              <TabsTrigger value="upload">
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Images
               </TabsTrigger>
             </TabsList>
-
-            <TabsContent value="upload">
-              <div className="space-y-4">
-                <Alert>
-                  <AlertDescription>
-                    Upload your images directly to avoid CORS issues. This method works with any image file on your
-                    device.
-                  </AlertDescription>
-                </Alert>
-
-                <div
-                  className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-12 cursor-pointer hover:bg-gray-50 transition-colors"
-                  onClick={triggerFileInput}
-                >
-                  <Upload className="h-8 w-8 mb-4 text-gray-400" />
-                  <p className="text-sm text-gray-500 mb-1">Click to upload or drag and drop</p>
-                  <p className="text-xs text-gray-400">PNG, JPG, WEBP, GIF up to 10MB</p>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept="image/*"
-                    multiple
-                    onChange={handleFileUpload}
-                  />
-                </div>
-
-                {uploadedFiles.length > 0 && (
-                  <div className="mt-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm font-medium">Uploaded files:</p>
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        onClick={deleteAllFiles}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete All Files
-                      </Button>
-                    </div>
-                    <ul className="text-sm text-gray-500 space-y-1">
-                      {uploadedFiles.map((file, index) => (
-                        <li key={index}>
-                          {file.name} ({(file.size / 1024).toFixed(2)} KB)
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="direct">
-              <form onSubmit={handleDirectImageSubmit} className="space-y-4">
-                <Alert>
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    Direct image URLs may fail due to CORS restrictions. If you encounter errors, the app will create a
-                    placeholder based on the HTML tag dimensions.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="space-y-2">
-                  <Label htmlFor="direct-url">Direct Image URL</Label>
-                  <Input
-                    id="direct-url"
-                    type="url"
-                    placeholder="https://example.com/image.jpg"
-                    value={directImageUrl}
-                    onChange={(e) => setDirectImageUrl(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <Label htmlFor="image-html" className="mr-2">
-                      Or paste an image HTML tag
-                    </Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-gray-400" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs">
-                            If the image can't be loaded directly, the app will create a placeholder based on the
-                            dimensions in the HTML tag.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                  <Textarea
-                    id="image-html"
-                    placeholder='<img src="/path/to/image.jpg" alt="Description" width="800" height="1000">'
-                    value={directImageHtml}
-                    onChange={(e) => setDirectImageHtml(e.target.value)}
-                    className="min-h-[100px]"
-                  />
-                </div>
-
-                {!directImageUrl && directImageHtml && (
-                  <div className="space-y-2">
-                    <Label htmlFor="base-url-direct">Base URL for relative paths</Label>
-                    <Input
-                      id="base-url-direct"
-                      type="url"
-                      placeholder="https://example.com"
-                      value={baseUrl}
-                      onChange={(e) => setBaseUrl(e.target.value)}
-                    />
-                  </div>
-                )}
-
-                <Button type="submit">Process Image</Button>
-              </form>
-
-              {/* Hidden canvas for HTML tag processing */}
-              <canvas ref={htmlCanvasRef} style={{ display: "none" }} width="800" height="600" />
-            </TabsContent>
 
             <TabsContent value="webpage">
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -1257,6 +1137,126 @@ export default function ImageProcessor() {
                   </div>
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="direct">
+              <form onSubmit={handleDirectImageSubmit} className="space-y-4">
+                <Alert>
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  <AlertDescription>
+                    Direct image URLs may fail due to CORS restrictions. If you encounter errors, the app will create a
+                    placeholder based on the HTML tag dimensions.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="space-y-2">
+                  <Label htmlFor="direct-url">Direct Image URL</Label>
+                  <Input
+                    id="direct-url"
+                    type="url"
+                    placeholder="https://example.com/image.jpg"
+                    value={directImageUrl}
+                    onChange={(e) => setDirectImageUrl(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <Label htmlFor="image-html" className="mr-2">
+                      Or paste an image HTML tag
+                    </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">
+                            If the image can't be loaded directly, the app will create a placeholder based on the
+                            dimensions in the HTML tag.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <Textarea
+                    id="image-html"
+                    placeholder='<img src="/path/to/image.jpg" alt="Description" width="800" height="1000">'
+                    value={directImageHtml}
+                    onChange={(e) => setDirectImageHtml(e.target.value)}
+                    className="min-h-[100px]"
+                  />
+                </div>
+
+                {!directImageUrl && directImageHtml && (
+                  <div className="space-y-2">
+                    <Label htmlFor="base-url-direct">Base URL for relative paths</Label>
+                    <Input
+                      id="base-url-direct"
+                      type="url"
+                      placeholder="https://example.com"
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <Button type="submit">Process Image</Button>
+              </form>
+
+              {/* Hidden canvas for HTML tag processing */}
+              <canvas ref={htmlCanvasRef} style={{ display: "none" }} width="800" height="600" />
+            </TabsContent>
+
+            <TabsContent value="upload">
+              <div className="space-y-4">
+                <Alert>
+                  <AlertDescription>
+                    Upload your images directly to avoid CORS issues. This method works with any image file on your
+                    device.
+                  </AlertDescription>
+                </Alert>
+
+                <div
+                  className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-12 cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={triggerFileInput}
+                >
+                  <Upload className="h-8 w-8 mb-4 text-gray-400" />
+                  <p className="text-sm text-gray-500 mb-1">Click to upload or drag and drop</p>
+                  <p className="text-xs text-gray-400">PNG, JPG, WEBP, GIF up to 10MB</p>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileUpload}
+                  />
+                </div>
+
+                {uploadedFiles.length > 0 && (
+                  <div className="mt-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-sm font-medium">Uploaded files:</p>
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={deleteAllFiles}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete All Files
+                      </Button>
+                    </div>
+                    <ul className="text-sm text-gray-500 space-y-1">
+                      {uploadedFiles.map((file, index) => (
+                        <li key={index}>
+                          {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
 
