@@ -4,6 +4,13 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 
+# ARG for debug flag (moved here after the first FROM)
+ARG NEXT_PUBLIC_DEBUG=false
+ENV NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
+
+# Make sure to print environment variables during build for debugging
+RUN echo "Debug setting: $NEXT_PUBLIC_DEBUG"
+
 # Copy package files
 COPY package.json pnpm-lock.yaml* ./
 
@@ -14,6 +21,10 @@ RUN npm install -g pnpm && \
 # Stage 2: Builder
 FROM node:22-alpine AS builder
 WORKDIR /app
+
+# Pass the debug flag to the builder stage
+ARG NEXT_PUBLIC_DEBUG=false
+ENV NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
 
 # Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
@@ -28,7 +39,9 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV NEXT_PUBLIC_DEBUG=false
+# Pass the debug flag to the runner stage
+ARG NEXT_PUBLIC_DEBUG=false
+ENV NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 

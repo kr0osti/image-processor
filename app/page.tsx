@@ -146,7 +146,9 @@ export default function ImageProcessor() {
   }, [imageUrls])
 
   const addLog = (message: string) => {
-    // Check if DEBUG is enabled
+    // Check if DEBUG is enabled - add more explicit logging to debug the issue
+    console.log(`Debug setting: ${process.env.NEXT_PUBLIC_DEBUG}`)
+    
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[${new Date().toLocaleTimeString()}] ${message}`)
     }
