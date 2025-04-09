@@ -501,6 +501,16 @@ export default function ImageProcessor() {
     })
   }
 
+  const getProxiedImageUrl = (imageUrl: string): string => {
+    // Only proxy remote URLs, not data URLs or object URLs
+    if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
+      return imageUrl;
+    }
+    
+    // Use our proxy API route
+    return `/api/proxy?url=${encodeURIComponent(imageUrl)}`;
+  };
+
   const processImageWithCanvas = (imageUrl: string): Promise<string | null> => {
     if (!isBrowser) return Promise.resolve(null)
     
@@ -589,7 +599,7 @@ export default function ImageProcessor() {
       }
 
       addLog(`Loading image: ${imageUrl}`)
-      img.src = imageUrl
+      img.src = getProxiedImageUrl(imageUrl)
     })
   }
 
@@ -1007,12 +1017,12 @@ export default function ImageProcessor() {
                         <div className="relative h-[150px] w-full bg-gray-100">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={imgUrl || "/placeholder.svg"}
+                            src={getProxiedImageUrl(imgUrl) || "/placeholder.svg"}
                             alt={`Image ${index + 1}`}
                             className="object-contain w-full h-full"
                             onError={(e) => {
                               // Replace broken images with placeholder
-                              e.currentTarget.src = "/placeholder.svg?height=150&width=150"
+                              e.currentTarget.src = "/placeholder.svg?height=150&width=150";
                             }}
                           />
                         </div>
