@@ -3,6 +3,18 @@ import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { existsSync } from 'fs';
+import { cleanupOldUploads } from '@/app/utils/cleanup';
+
+// Run cleanup on server start (will run when this file is first imported)
+(async () => {
+  try {
+    console.log('Running initial cleanup of old uploads...');
+    const result = await cleanupOldUploads();
+    console.log(`Initial cleanup complete. Deleted ${result.deleted} files.`);
+  } catch (error) {
+    console.error('Error during initial cleanup:', error);
+  }
+})();
 
 // Ensure uploads directory exists
 async function ensureUploadsDir() {
