@@ -42,11 +42,17 @@ The easiest way to run the application is using Docker:
 git clone https://github.com/yourusername/nextjs-image-processor.git
 cd nextjs-image-processor
 
+# Set up proper permissions for the uploads directory
+chmod +x setup-permissions.sh
+./setup-permissions.sh
+
 # Start the application with Docker Compose
 docker compose up
 ```
 
-The application will be available at http://localhost:3000
+The application will be available at http://localhost:6060
+
+> **Important**: If you encounter permission errors when uploading images, make sure the `public/uploads` directory has write permissions for the Docker container. You can fix this by running the `setup-permissions.sh` script.
 
 ### 🎨 Customizing Your Installation
 
@@ -83,6 +89,28 @@ You can customize the application metadata by setting these environment variable
 | `NEXT_PUBLIC_SITE_URL` | Your site's URL | https://yourdomain.com |
 | `NEXT_PUBLIC_SITE_THEME_COLOR` | Theme color (hex) | #000000 |
 | `NEXT_PUBLIC_SITE_BACKGROUND_COLOR` | Background color (hex) | #ffffff |
+
+### Troubleshooting Docker Builds
+
+If you encounter issues with the Docker build process:
+
+1. Ensure your `next.config.js` file includes the `output: 'standalone'` setting:
+   ```javascript
+   /** @type {import('next').NextConfig} */
+   const nextConfig = {
+     // Other settings...
+     output: 'standalone',
+   }
+   ```
+
+2. Check that your Docker volumes are properly configured in `docker-compose.yaml`:
+   ```yaml
+   volumes:
+     - ./custom-icons:/app/public/custom-icons
+     - ./public/uploads:/app/public/uploads
+   ```
+
+3. If you have multiple Next.js config files (e.g., `next.config.js` and `next.config.mjs`), be aware that `next.config.js` takes precedence.
 
 ### Manual Setup
 

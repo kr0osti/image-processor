@@ -75,11 +75,14 @@ export default function ImageProcessor() {
       return
     }
     
+    // Convert relative URL to absolute URL
+    const absoluteUrl = new URL(dataUrl, window.location.origin).toString()
+    
     if (!navigator.clipboard) {
       // Fallback for browsers that don't support the Clipboard API
       try {
         const textArea = document.createElement('textarea')
-        textArea.value = dataUrl
+        textArea.value = absoluteUrl
         textArea.style.position = 'fixed'
         document.body.appendChild(textArea)
         textArea.focus()
@@ -88,8 +91,8 @@ export default function ImageProcessor() {
         document.body.removeChild(textArea)
         
         if (successful) {
-          toast.success("Image URL copied to clipboard")
-          addLog("Image URL copied to clipboard (fallback method)")
+          toast.success("Full image URL copied to clipboard")
+          addLog("Full image URL copied to clipboard (fallback method)")
         } else {
           toast.error("Failed to copy URL")
           addLog("Failed to copy URL (fallback method failed)")
@@ -102,10 +105,10 @@ export default function ImageProcessor() {
     }
     
     // Modern clipboard API
-    navigator.clipboard.writeText(dataUrl)
+    navigator.clipboard.writeText(absoluteUrl)
       .then(() => {
-        toast.success("Image URL copied to clipboard")
-        addLog("Image URL copied to clipboard")
+        toast.success("Full image URL copied to clipboard")
+        addLog("Full image URL copied to clipboard")
       })
       .catch(err => {
         toast.error("Failed to copy URL")
@@ -453,8 +456,8 @@ export default function ImageProcessor() {
     }
   }
 
-  // Update the existing convertToRealUrl function:
-  const convertDataUrlToRealUrl = async (dataUrl: string): Promise<string> => {
+  // Update the function that handles the image URL
+  const convertDataUrlToRealUrl = async (dataUrl: string): Promise<string | null> => {
     try {
       const response = await fetch('/api/images', {
         method: 'POST',
@@ -463,18 +466,22 @@ export default function ImageProcessor() {
         },
         body: JSON.stringify({ dataUrl }),
       });
-      
+
       if (!response.ok) {
-        throw new Error(`Failed to store image: ${response.statusText}`);
+        throw new Error(`Server responded with ${response.status}`);
       }
-      
+
       const data = await response.json();
-      addLog(`Generated real URL for image: ${data.url}`);
-      return data.url;
+      
+      if (data.success) {
+        // Return the API URL which should work more reliably
+        return data.apiUrl || data.url;
+      } else {
+        throw new Error(data.message || 'Failed to save image');
+      }
     } catch (error) {
-      addLog(`Error generating real URL: ${error}`);
-      // Fall back to data URL if conversion fails
-      return dataUrl;
+      console.error('Error converting data URL to real URL:', error);
+      return null;
     }
   }
 
@@ -502,8 +509,12 @@ export default function ImageProcessor() {
         if (processedImage) {
           // Convert data URL to real URL
           const realUrl = await convertDataUrlToRealUrl(processedImage)
-          processed.push(realUrl)
-          addLog(`Successfully processed image ${index + 1}`)
+          if (realUrl !== null) {
+            processed.push(realUrl)
+            addLog(`Successfully processed image ${index + 1}`)
+          } else {
+            addLog(`Failed to process image ${index + 1}`)
+          }
         }
       } catch (error) {
         addLog(`Error processing image ${index + 1}: ${error}`)

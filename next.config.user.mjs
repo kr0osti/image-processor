@@ -1,3 +1,5 @@
+// Rename this file to next.config.user.mjs to avoid conflicts with next.config.js
+
 let userConfig = undefined
 try {
   // try to import ESM first
@@ -51,4 +53,3 @@ if (userConfig) {
 }
 
 export default nextConfig
-

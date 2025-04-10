@@ -7,13 +7,14 @@ services:
         - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
     container_name: nextjs-image-processor
     restart: unless-stopped
+    user: "1001:1001" 
     ports:
       - "6060:3000"
     environment:
       - NODE_ENV=${NODE_ENV}
       - NODE_OPTIONS=${NODE_OPTIONS}
       - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
-      - HOSTNAME=${HOSTNAME}
+      - HOSTNAME=0.0.0.0
       - NEXT_PUBLIC_SITE_NAME=${NEXT_PUBLIC_SITE_NAME}
       - NEXT_PUBLIC_SITE_DESCRIPTION=${NEXT_PUBLIC_SITE_DESCRIPTION}
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
@@ -21,6 +22,7 @@ services:
       - NEXT_PUBLIC_SITE_BACKGROUND_COLOR=${NEXT_PUBLIC_SITE_BACKGROUND_COLOR}
     volumes:
       - ./custom-icons:/app/public/custom-icons
+      - ./public/uploads:/app/public/uploads
     healthcheck:
       test: ["CMD-SHELL", "echo 'Debug setting:' $NEXT_PUBLIC_DEBUG && curl -f http://localhost:3000/api/healthcheck || exit 1"]
       interval: 30s

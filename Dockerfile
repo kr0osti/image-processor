@@ -1,67 +1,56 @@
-# syntax=docker/dockerfile:1
+FROM node:22-alpine AS base
 
-# Stage 1: Dependencies
-FROM node:22-alpine AS deps
+# Install dependencies only when needed
+FROM base AS deps
 WORKDIR /app
 
-# ARG for debug flag (moved here after the first FROM)
-ARG NEXT_PUBLIC_DEBUG=false
-ENV NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
+# Install dependencies based on the preferred package manager
+COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
+RUN \
+  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+  elif [ -f package-lock.json ]; then npm ci; \
+  elif [ -f pnpm-lock.yaml ]; then yarn global add pnpm && pnpm i --no-frozen-lockfile; \
+  else echo "Lockfile not found." && exit 1; \
+  fi
 
-# Make sure to print environment variables during build for debugging
-RUN echo "Debug setting: $NEXT_PUBLIC_DEBUG"
-
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
-
-# Install dependencies using pnpm
-RUN npm install -g pnpm && \
-    pnpm install
-
-# Stage 2: Builder
-FROM node:22-alpine AS builder
+# Rebuild the source code only when needed
+FROM base AS builder
 WORKDIR /app
-
-# Pass the debug flag to the builder stage
-ARG NEXT_PUBLIC_DEBUG=false
-ENV NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
-
-# Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the application
-RUN npm install -g pnpm && \
-    pnpm build
+# Next.js collects completely anonymous telemetry data about general usage.
+# Learn more here: https://nextjs.org/telemetry
+# Uncomment the following line in case you want to disable telemetry during the build.
+ENV NEXT_TELEMETRY_DISABLED 1
 
-# Stage 3: Runner
-FROM node:22-alpine AS runner
+RUN yarn build
+
+# Production image, copy all the files and run next
+FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-# Pass the debug flag to the runner stage
-ARG NEXT_PUBLIC_DEBUG=false
-ENV NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
-ENV HOSTNAME=0.0.0.0
-ENV PORT=3000
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
 
-# Create a non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# Install curl for healthcheck
-RUN apk add --no-cache curl
+# Create uploads directory with proper permissions
+RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public && chmod -R 777 /app/public/uploads
 
-# Copy necessary files from builder
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
+
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Switch to non-root user
 USER nextjs
 
-# Expose the port
 EXPOSE 3000
 
-# Start the application
+ENV PORT 3000
+
 CMD ["node", "server.js"]
