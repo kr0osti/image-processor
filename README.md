@@ -12,6 +12,7 @@ A powerful web application that allows you to download, process, and standardize
 - **Download Options**: Download individual images or as a ZIP archive
 - **CORS Handling**: Creates placeholders for images that can't be loaded due to CORS restrictions
 - **Detailed Logging**: Real-time logs of all processing steps
+- **Automatic Cleanup**: Uploaded files are automatically deleted after 1 hour
 
 ## 🔍 How It Works
 
@@ -42,12 +43,15 @@ The easiest way to run the application is using Docker:
 git clone https://github.com/yourusername/nextjs-image-processor.git
 cd nextjs-image-processor
 
+# Create a .env file from the example
+cp .env.example .env
+
 # Set up proper permissions for the uploads directory
 chmod +x setup-permissions.sh
 ./setup-permissions.sh
 
 # Start the application with Docker Compose
-docker compose up
+docker compose up -d
 ```
 
 The application will be available at http://localhost:6060
@@ -55,6 +59,19 @@ The application will be available at http://localhost:6060
 > **Important**: If you encounter permission errors when uploading images, make sure the `public/uploads` directory has write permissions for the Docker container. You can fix this by running the `setup-permissions.sh` script.
 
 ### 🎨 Customizing Your Installation
+
+#### Environment Variables
+
+You can customize the application by setting these environment variables in your `.env` file:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_SITE_NAME` | The name of your site | NextJS Image Processor |
+| `NEXT_PUBLIC_SITE_DESCRIPTION` | Site description | A powerful web application... |
+| `NEXT_PUBLIC_SITE_URL` | Your site's URL | https://yourdomain.com |
+| `NEXT_PUBLIC_SITE_THEME_COLOR` | Theme color (hex) | #000000 |
+| `NEXT_PUBLIC_SITE_BACKGROUND_COLOR` | Background color (hex) | #ffffff |
+| `CLEANUP_API_KEY` | API key for the cleanup endpoint | change-this-to-a-secure-key |
 
 #### Custom Icons and Branding
 
@@ -72,61 +89,41 @@ You can customize the application's icons and branding by:
    - `apple-icon.png` - Icon for Apple devices (180x180 pixels)
    - `safari-pinned-tab.svg` - SVG icon for Safari pinned tabs
 
-3. Mount this directory in your docker-compose.yaml:
-   ```yaml
-   volumes:
-     - ./custom-icons:/app/public/custom-icons
-   ```
+3. The Docker Compose configuration automatically mounts this directory to make your custom icons available to the application.
 
-#### Environment Variables
+### 🔧 System Architecture
 
-You can customize the application metadata by setting these environment variables:
+The application consists of two Docker containers:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_SITE_NAME` | The name of your site | NextJS Image Processor |
-| `NEXT_PUBLIC_SITE_DESCRIPTION` | Site description | A powerful web application... |
-| `NEXT_PUBLIC_SITE_URL` | Your site's URL | https://yourdomain.com |
-| `NEXT_PUBLIC_SITE_THEME_COLOR` | Theme color (hex) | #000000 |
-| `NEXT_PUBLIC_SITE_BACKGROUND_COLOR` | Background color (hex) | #ffffff |
+1. **Main Application (app)**: The NextJS application that handles image processing
+2. **Cleanup Service (cleanup-cron)**: A cron job that runs every minute to delete uploaded files older than 1 hour
 
-### Troubleshooting Docker Builds
+### 🛠️ Troubleshooting
+
+#### Permission Issues
+
+If you encounter permission errors when uploading images:
+
+```bash
+# Run the setup-permissions script
+./setup-permissions.sh
+```
+
+#### Docker Build Issues
 
 If you encounter issues with the Docker build process:
 
-1. Ensure your `next.config.js` file includes the `output: 'standalone'` setting:
-   ```javascript
-   /** @type {import('next').NextConfig} */
-   const nextConfig = {
-     // Other settings...
-     output: 'standalone',
-   }
-   ```
+1. Ensure your Docker and Docker Compose are up to date
+2. Check that the ports specified in `docker-compose.yaml` are available on your system
+3. Verify that the environment variables in your `.env` file are correctly formatted
 
-2. Check that your Docker volumes are properly configured in `docker-compose.yaml`:
-   ```yaml
-   volumes:
-     - ./custom-icons:/app/public/custom-icons
-     - ./public/uploads:/app/public/uploads
-   ```
+#### Healthcheck Failures
 
-3. If you have multiple Next.js config files (e.g., `next.config.js` and `next.config.mjs`), be aware that `next.config.js` takes precedence.
+The application includes a healthcheck that runs every 30 seconds. If the healthcheck fails:
 
-### Manual Setup
-
-If you prefer to run the application without Docker:
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/nextjs-image-processor.git
-cd nextjs-image-processor
-
-# Install dependencies
-pnpm install
-
-# Run the development server
-pnpm dev
-```
+1. Check the container logs: `docker logs nextjs-image-processor`
+2. Verify that the application is running: `curl http://localhost:6060/api/healthcheck`
+3. Restart the container: `docker compose restart app`
 
 ## 🛠️ Development
 
