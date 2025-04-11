@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+/**
+ * API route handler for proxying images from external sources
+ *
+ * This endpoint fetches images from external URLs and serves them through
+ * the application's domain to avoid CORS issues. It adds appropriate headers
+ * to make the images accessible to the client-side code.
+ *
+ * @param {NextRequest} request - The incoming HTTP request
+ * @returns {Promise<NextResponse>} The proxied image or error response
+ * @throws {Error} If the image cannot be fetched or processed
+ */
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url');
-  
+
   if (!url) {
     return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 });
   }
-  
+
   try {
     const response = await fetch(url, {
       headers: {
@@ -19,14 +30,14 @@ export async function GET(request: NextRequest) {
         "Sec-Fetch-Site": "cross-site"
       },
     });
-    
+
     if (!response.ok) {
       return NextResponse.json({ error: `Failed to fetch image: ${response.statusText}` }, { status: response.status });
     }
-    
+
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const buffer = await response.arrayBuffer();
-    
+
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
