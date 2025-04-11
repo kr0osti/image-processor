@@ -11,7 +11,7 @@ on:
 jobs:
   accessibility:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,6 +27,10 @@ jobs:
         with:
           version: 8
           run_install: false
+
+      # This step is important to ensure pnpm is in the PATH
+      - name: Setup pnpm path
+        run: echo "$(pnpm -g bin)" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: pnpm install
@@ -50,6 +54,9 @@ jobs:
           timeout 30 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 1; done'
           echo "Application started"
 
+      - name: Install pa11y-ci
+        run: npm install -g pa11y-ci
+
       - name: Run accessibility tests
         run: |
-          npx pa11y-ci --config .pa11yci.json
+          pa11y-ci --config .pa11yci.json

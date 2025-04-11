@@ -26,6 +26,10 @@ jobs:
           version: 8
           run_install: false
 
+      # This step is important to ensure pnpm is in the PATH
+      - name: Setup pnpm path
+        run: echo "$(pnpm -g bin)" >> $GITHUB_PATH
+
       - name: Get pnpm store directory
         id: pnpm-cache
         shell: bash

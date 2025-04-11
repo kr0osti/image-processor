@@ -15,12 +15,27 @@ RUN npm install -g pnpm && \
     pnpm install --prod
 
 # Create a simple script to run the cleanup service
-RUN echo '#!/bin/sh\n\
-while true; do\n\
-  echo "Running cleanup..."\n\
-  curl -s "http://app:3000/api/cleanup?key=$CLEANUP_API_KEY"\n\
-  echo "Sleeping for 60 seconds..."\n\
-  sleep 60\n\
+RUN echo '#!/bin/sh
+
+# Function to run cleanup
+run_cleanup() {
+  echo "Running cleanup at $(date)"
+  RESPONSE=$(curl -s -w "\n%{http_code}" "http://app:3000/api/cleanup?key=$CLEANUP_API_KEY")
+  HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+  BODY=$(echo "$RESPONSE" | sed "$d")
+
+  if [ "$HTTP_CODE" = "200" ]; then
+    echo "Cleanup successful: $BODY"
+  else
+    echo "Cleanup failed with status $HTTP_CODE: $BODY"
+  fi
+}
+
+# Main loop
+while true; do
+  run_cleanup
+  echo "Sleeping for 60 seconds..."
+  sleep 60
 done' > /app/cleanup.sh && \
 chmod +x /app/cleanup.sh
 
