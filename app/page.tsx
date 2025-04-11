@@ -74,10 +74,10 @@ export default function ImageProcessor() {
       addLog("Cannot copy URL in server context")
       return
     }
-    
+
     // Convert relative URL to absolute URL
     const absoluteUrl = new URL(dataUrl, window.location.origin).toString()
-    
+
     if (!navigator.clipboard) {
       // Fallback for browsers that don't support the Clipboard API
       try {
@@ -89,7 +89,7 @@ export default function ImageProcessor() {
         textArea.select()
         const successful = document.execCommand('copy')
         document.body.removeChild(textArea)
-        
+
         if (successful) {
           toast.success("Full image URL copied to clipboard")
           addLog("Full image URL copied to clipboard (fallback method)")
@@ -103,7 +103,7 @@ export default function ImageProcessor() {
       }
       return
     }
-    
+
     // Modern clipboard API
     navigator.clipboard.writeText(absoluteUrl)
       .then(() => {
@@ -123,17 +123,17 @@ export default function ImageProcessor() {
         .filter(img => {
           // Filter by predefined sizes
           const matchesPresetSize = sizeFilter.includes(img.size || 'unknown');
-          
+
           // Filter by custom dimensions if enabled
-          const matchesCustomSize = customSizeEnabled ? 
-            (!minWidth || (img.width && img.width >= minWidth)) && 
-            (!minHeight || (img.height && img.height >= minHeight)) : 
+          const matchesCustomSize = customSizeEnabled ?
+            (!minWidth || (img.width && img.width >= minWidth)) &&
+            (!minHeight || (img.height && img.height >= minHeight)) :
             true;
-          
+
           return matchesPresetSize || (customSizeEnabled && matchesCustomSize);
         })
         .map(img => img.url)
-      
+
       setFilteredImages(filtered)
       addLog(`Filtered to ${filtered.length} images based on size criteria`)
     } else {
@@ -151,7 +151,7 @@ export default function ImageProcessor() {
   const addLog = (message: string) => {
     // Check if DEBUG is enabled - add more explicit logging to debug the issue
     console.log(`Debug setting: ${process.env.NEXT_PUBLIC_DEBUG}`)
-    
+
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[${new Date().toLocaleTimeString()}] ${message}`)
     }
@@ -187,17 +187,17 @@ export default function ImageProcessor() {
         addLog(`Error: ${result.error}`)
       } else if (result.imageUrls) {
         addLog(`Found ${result.imageUrls.length} images on the page`)
-        
+
         // Store initial metadata
         const metadata = result.imageMetadata || (result.imageUrls ? result.imageUrls.map((imgUrl, index) => {
           const filename = imgUrl.split("/").pop()?.split("?")[0] || `image-${index + 1}`
           return { url: imgUrl, filename, size: 'unknown' as const }
         }) : []);
-        
+
         setImageMetadata(metadata)
         setFetchedImages(result.imageUrls)
         setFilteredImages(result.imageUrls)
-        
+
         // Load images to determine their sizes
         addLog("Loading images to determine sizes...")
         loadImageSizes(result.imageUrls)
@@ -283,7 +283,7 @@ export default function ImageProcessor() {
 
   const createPlaceholderForFailedImage = (imageUrl: string): Promise<string> => {
     if (!isBrowser) return Promise.resolve('')
-    
+
     return new Promise((resolve) => {
       addLog(`Creating placeholder for failed image: ${imageUrl}`)
 
@@ -472,7 +472,7 @@ export default function ImageProcessor() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         // Return the API URL which should work more reliably
         return data.apiUrl || data.url;
@@ -538,7 +538,7 @@ export default function ImageProcessor() {
 
   const processPlaceholderAsImage = (dataUrl: string): Promise<string | null> => {
     if (!isBrowser) return Promise.resolve(null)
-    
+
     return new Promise((resolve) => {
       const img = new Image()
 
@@ -592,14 +592,14 @@ export default function ImageProcessor() {
     if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
       return imageUrl;
     }
-    
+
     // Use our proxy API route
     return `/api/proxy?url=${encodeURIComponent(imageUrl)}`;
   };
 
   const processImageWithCanvas = (imageUrl: string): Promise<string | null> => {
     if (!isBrowser) return Promise.resolve(null)
-    
+
     return new Promise((resolve) => {
       const img = new Image()
       img.crossOrigin = "anonymous" // Prevent CORS issues
@@ -634,23 +634,29 @@ export default function ImageProcessor() {
         ctx.fillStyle = "white"
         ctx.fillRect(0, 0, 1500, 1500)
 
-        // Determine if image has white border
-        const hasBorder = detectWhiteBorder(img, ctx)
-        addLog(`Image border detection: ${hasBorder ? "Has white border" : "No white border"}`)
+        // Determine if image has white background
+        const hasWhiteBackground = detectWhiteBorder(img, ctx)
+        addLog(`Image background detection: ${hasWhiteBackground ? "White background" : "No white background"}`)
 
-        // Process image based on orientation and border
-        if (hasBorder) {
-          // For images with white border, center with 200px borders
-          const maxDimension = Math.min(1100, img.width, img.height) // 1500 - (200*2) = 1100
-          const scale = maxDimension / Math.max(img.width, img.height)
+        // Process image based on orientation and background
+        if (hasWhiteBackground) {
+          // For small objects on white backgrounds, use more padding
+          // Calculate the actual object size by estimating non-white area
+          const objectSize = Math.max(img.width, img.height)
+          const padding = 300 // Increased padding for small objects
+          const maxSize = 1500 - (padding * 2)
+
+          // Scale the image to fit within the padded area
+          const scale = maxSize / objectSize
           const newWidth = img.width * scale
           const newHeight = img.height * scale
           const x = (1500 - newWidth) / 2
           const y = (1500 - newHeight) / 2
-          addLog(`Resizing with border: ${newWidth}x${newHeight}, position: (${x}, ${y})`)
+
+          addLog(`Resizing with padding: ${newWidth}x${newHeight}, position: (${x}, ${y})`)
           ctx.drawImage(img, x, y, newWidth, newHeight)
         } else {
-          // For images without border
+          // For images without white background
           if (img.width === img.height) {
             // Square image
             addLog("Processing as square image")
@@ -701,46 +707,57 @@ export default function ImageProcessor() {
         return false
       }
 
-      tempCtx.drawImage(img, 0, 0)
+      // Draw the image on the temporary canvas
+      tempCtx.drawImage(img, 0, 0, img.width, img.height)
 
-      // Sample pixels from the edges
-      const topRow = tempCtx.getImageData(0, 0, img.width, 1).data
-      const bottomRow = tempCtx.getImageData(0, img.height - 1, img.width, 1).data
-      const leftCol = tempCtx.getImageData(0, 0, 1, img.height).data
-      const rightCol = tempCtx.getImageData(img.width - 1, 0, 1, img.height).data
+      // Sample more pixels from the edges for better detection
+      const sampleSize = Math.max(10, Math.floor(Math.min(img.width, img.height) * 0.05))
 
-      // Check if most of the edge pixels are white
-      const isWhitePixel = (r: number, g: number, b: number) => r > 240 && g > 240 && b > 240
-
+      // Check if the image has a predominantly white background
+      // Sample pixels from various parts of the image, not just the edges
       let whitePixelCount = 0
       let totalPixels = 0
 
-      const checkPixels = (data: Uint8ClampedArray) => {
-        for (let i = 0; i < data.length; i += 4) {
+      // Sample from edges and interior
+      const regions = [
+        // Edges
+        { x: 0, y: 0, width: img.width, height: sampleSize }, // top
+        { x: 0, y: img.height - sampleSize, width: img.width, height: sampleSize }, // bottom
+        { x: 0, y: sampleSize, width: sampleSize, height: img.height - (2 * sampleSize) }, // left
+        { x: img.width - sampleSize, y: sampleSize, width: sampleSize, height: img.height - (2 * sampleSize) }, // right
+
+        // Sample from center area too
+        { x: img.width * 0.25, y: img.height * 0.25, width: img.width * 0.5, height: img.height * 0.5 }
+      ]
+
+      for (const region of regions) {
+        const imageData = tempCtx.getImageData(region.x, region.y, region.width, region.height)
+        const data = imageData.data
+
+        for (let i = 0; i < data.length; i += 16) { // Sample every 4th pixel for performance
           const r = data[i]
           const g = data[i + 1]
           const b = data[i + 2]
+          const a = data[i + 3]
 
-          if (isWhitePixel(r, g, b)) {
+          // Consider transparent pixels as white too
+          if ((r > 240 && g > 240 && b > 240) || a < 50) {
             whitePixelCount++
           }
           totalPixels++
         }
       }
 
-      checkPixels(topRow)
-      checkPixels(bottomRow)
-      checkPixels(leftCol)
-      checkPixels(rightCol)
-
-      // If more than 70% of edge pixels are white, consider it has a white border
+      // If more than 85% of sampled pixels are white, consider it has a white background
       const whiteRatio = whitePixelCount / totalPixels
-      addLog(`Border detection: ${whitePixelCount}/${totalPixels} white pixels (${(whiteRatio * 100).toFixed(2)}%)`)
-      return whiteRatio > 0.7
+      addLog(`Background detection: ${whitePixelCount}/${totalPixels} white pixels (${(whiteRatio * 100).toFixed(2)}%)`)
+
+      // For small objects on white backgrounds, we need a higher threshold
+      return whiteRatio > 0.85
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
-      addLog(`Error in border detection: ${errorMessage}`)
-      console.error("Error detecting white border:", error)
+      addLog(`Error in background detection: ${errorMessage}`)
+      console.error("Error detecting white background:", error)
       return false
     }
   }
@@ -831,14 +848,14 @@ export default function ImageProcessor() {
         URL.revokeObjectURL(url)
       }
     })
-    
+
     // Reset all file-related state
     setUploadedFiles([])
     setImageUrls([])
     setProcessedImages([])
     setFetchedImages([])
     setSelectedImages([])
-    
+
     addLog("All files deleted")
   }
 
@@ -876,9 +893,9 @@ export default function ImageProcessor() {
   // Add this function to determine image size category
   const determineImageSize = (width?: number, height?: number): 'small' | 'medium' | 'large' | 'unknown' => {
     if (!width || !height) return 'unknown'
-    
+
     const area = width * height
-    
+
     if (area < 90000) { // Less than 300x300
       return 'small'
     } else if (area < 360000) { // Less than 600x600
@@ -891,7 +908,7 @@ export default function ImageProcessor() {
   // Add this function to load image sizes
   const loadImageSizes = (urls: string[]) => {
     let loaded = 0
-    
+
     urls.forEach((url, index) => {
       const img = new Image()
       img.onload = () => {
@@ -899,7 +916,7 @@ export default function ImageProcessor() {
         setImageMetadata(prev => {
           const updated = [...prev]
           const size = determineImageSize(img.width, img.height)
-          
+
           if (updated[index]) {
             updated[index] = {
               ...updated[index],
@@ -908,7 +925,7 @@ export default function ImageProcessor() {
               size
             }
           }
-          
+
           if (loaded === urls.length) {
             const counts = {
               small: updated.filter(m => m.size === 'small').length,
@@ -916,28 +933,28 @@ export default function ImageProcessor() {
               large: updated.filter(m => m.size === 'large').length,
               unknown: updated.filter(m => m.size === 'unknown').length
             }
-            
+
             addLog(`Image sizes: ${counts.small} small, ${counts.medium} medium, ${counts.large} large, ${counts.unknown} unknown`)
           }
-          
+
           return updated
         })
       }
-      
+
       img.onerror = () => {
         loaded++
         // Keep as unknown size
       }
-      
+
       img.src = getProxiedImageUrl(url)
     })
   }
 
   // Add this function to toggle size filter
   const toggleSizeFilter = (size: 'small' | 'medium' | 'large' | 'unknown') => {
-    setSizeFilter(prev => 
-      prev.includes(size) 
-        ? prev.filter(s => s !== size) 
+    setSizeFilter(prev =>
+      prev.includes(size)
+        ? prev.filter(s => s !== size)
         : [...prev, size]
     )
   }
@@ -947,7 +964,7 @@ export default function ImageProcessor() {
       <Card className="max-w-4xl mx-auto">
         <CardHeader>
           <CardTitle>Image Processor</CardTitle>
-          <CardDescription>Download and process images to 1500x1500px with appropriate positioning</CardDescription>
+          <CardDescription>Download and proccess images to 1500x1500px with appropriate positioning</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="webpage">
@@ -1016,9 +1033,9 @@ export default function ImageProcessor() {
 
               {fetchedImages.length > 0 && (
                 <div className="mt-4 flex justify-end">
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     onClick={deleteAllFiles}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -1044,12 +1061,12 @@ export default function ImageProcessor() {
                         <DropdownMenuContent align="end" className="w-56">
                           <DropdownMenuLabel>Filter by Size</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          
+
                           {/* Preset size filters */}
                           <div className="p-2">
                             <div className="flex items-center space-x-2 mb-2">
-                              <Checkbox 
-                                id="size-small" 
+                              <Checkbox
+                                id="size-small"
                                 checked={sizeFilter.includes('small')}
                                 onCheckedChange={() => toggleSizeFilter('small')}
                               />
@@ -1057,10 +1074,10 @@ export default function ImageProcessor() {
                                 Small ({imageMetadata.filter(m => m.size === 'small').length})
                               </label>
                             </div>
-                            
+
                             <div className="flex items-center space-x-2 mb-2">
-                              <Checkbox 
-                                id="size-medium" 
+                              <Checkbox
+                                id="size-medium"
                                 checked={sizeFilter.includes('medium')}
                                 onCheckedChange={() => toggleSizeFilter('medium')}
                               />
@@ -1068,10 +1085,10 @@ export default function ImageProcessor() {
                                 Medium ({imageMetadata.filter(m => m.size === 'medium').length})
                               </label>
                             </div>
-                            
+
                             <div className="flex items-center space-x-2">
-                              <Checkbox 
-                                id="size-large" 
+                              <Checkbox
+                                id="size-large"
                                 checked={sizeFilter.includes('large')}
                                 onCheckedChange={() => toggleSizeFilter('large')}
                               />
@@ -1080,14 +1097,14 @@ export default function ImageProcessor() {
                               </label>
                             </div>
                           </div>
-                          
+
                           <DropdownMenuSeparator />
-                          
+
                           {/* Custom size filter */}
                           <div className="p-2">
                             <div className="flex items-center space-x-2">
-                              <Checkbox 
-                                id="custom-size" 
+                              <Checkbox
+                                id="custom-size"
                                 checked={customSizeEnabled}
                                 onCheckedChange={(checked) => setCustomSizeEnabled(!!checked)}
                               />
@@ -1095,7 +1112,7 @@ export default function ImageProcessor() {
                                 Custom Size
                               </label>
                             </div>
-                            
+
                             {customSizeEnabled && (
                               <div className="mt-2 space-y-2">
                                 <div className="flex items-center space-x-2">
@@ -1125,7 +1142,7 @@ export default function ImageProcessor() {
                           </div>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      
+
                       <Button variant="outline" size="sm" onClick={selectAllImages}>
                         {selectedImages.length === filteredImages.length ? "Deselect All" : "Select All"}
                       </Button>
@@ -1159,7 +1176,7 @@ export default function ImageProcessor() {
                           {imageMetadata.find(m => m.url === imgUrl)?.size && (
                             <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
                               {imageMetadata.find(m => m.url === imgUrl)?.size}
-                              {imageMetadata.find(m => m.url === imgUrl)?.width && imageMetadata.find(m => m.url === imgUrl)?.height && 
+                              {imageMetadata.find(m => m.url === imgUrl)?.width && imageMetadata.find(m => m.url === imgUrl)?.height &&
                                 ` (${imageMetadata.find(m => m.url === imgUrl)?.width}×${imageMetadata.find(m => m.url === imgUrl)?.height})`
                               }
                             </div>
@@ -1205,9 +1222,9 @@ export default function ImageProcessor() {
                   <div className="mt-4">
                     <div className="flex justify-between items-center mb-2">
                       <p className="text-sm font-medium">Uploaded files:</p>
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
+                      <Button
+                        variant="destructive"
+                        size="sm"
                         onClick={deleteAllFiles}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -1230,7 +1247,7 @@ export default function ImageProcessor() {
           {error && <p className="text-red-500 mt-4">{error}</p>}
 
           {/* Hidden canvas for image processing */}
-          <canvas 
+          <canvas
             ref={canvasRef}
             width={1500}
             height={1500}
