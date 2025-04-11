@@ -4,8 +4,9 @@ import { existsSync } from 'fs';
 
 /**
  * Deletes files in the uploads directory that are older than the specified age
- * @param {number} maxAgeMs Maximum age of files in milliseconds (default: 1 hour)
- * @returns {Promise<{deleted: number, errors: number}>} Count of deleted files and errors
+ * @param {number} maxAgeMs - Maximum age of files in milliseconds (default: 1 hour)
+ * @returns {Promise<{deleted: number, errors: number}>} Object containing count of deleted files and errors
+ * @throws {Error} If there's an issue accessing the filesystem
  */
 export async function cleanupOldUploads(maxAgeMs = 60 * 60 * 1000) { // Default: 1 hour
   const uploadsDir = path.join(process.cwd(), 'public', 'uploads');

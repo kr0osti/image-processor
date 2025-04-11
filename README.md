@@ -13,6 +13,7 @@ A powerful web application that allows you to download, process, and standardize
 - **CORS Handling**: Creates placeholders for images that can't be loaded due to CORS restrictions
 - **Detailed Logging**: Real-time logs of all processing steps
 - **Automatic Cleanup**: Uploaded files are automatically deleted after 1 hour
+- **Rate Limiting**: All API endpoints are protected with rate limiting to prevent abuse
 
 ## 🔍 How It Works
 
@@ -124,6 +125,19 @@ The application includes a healthcheck that runs every 30 seconds. If the health
 1. Check the container logs: `docker logs nextjs-image-processor`
 2. Verify that the application is running: `curl http://localhost:6060/api/healthcheck`
 3. Restart the container: `docker compose restart app`
+
+#### Rate Limiting
+
+All API endpoints are protected with rate limiting to prevent abuse. The default limits are:
+
+- Global API limit: 1000 requests per minute across all API endpoints
+- Proxy endpoint: 500 requests per minute
+- Serve-image endpoint: 120 requests per minute
+- Images endpoint: 300 requests per minute
+- Cleanup endpoint: 5 requests per minute
+- Healthcheck endpoint: 30 requests per minute
+
+If you encounter rate limit errors (HTTP 429), wait a minute before trying again.
 
 ## 🛠️ Development
 

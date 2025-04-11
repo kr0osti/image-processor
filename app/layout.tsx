@@ -1,11 +1,19 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { DebugInfo } from "@/components/debug-info"
 
 const inter = Inter({ subsets: ["latin"] })
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: process.env.NEXT_PUBLIC_SITE_THEME_COLOR || '#000000',
+}
 
 export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_SITE_NAME || "Image Processor",
@@ -28,13 +36,6 @@ export const metadata: Metadata = {
       },
     ],
   },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
-  themeColor: process.env.NEXT_PUBLIC_SITE_THEME_COLOR || '#000000',
 }
 
 export default function RootLayout({
