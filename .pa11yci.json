@@ -1,0 +1,15 @@
+{
+  "defaults": {
+    "timeout": 10000,
+    "wait": 1000,
+    "standard": "WCAG2AA",
+    "ignore": [
+      "notice"
+    ]
+  },
+  "urls": [
+    "http://localhost:3000/",
+    "http://localhost:3000/?tab=url",
+    "http://localhost:3000/?tab=web"
+  ]
+}

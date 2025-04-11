@@ -1,0 +1,55 @@
+name: Accessibility Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 0 * * 1'  # Run weekly on Monday at midnight
+
+jobs:
+  accessibility:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build application
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_SITE_NAME: "NextJS Image Processor"
+          NEXT_PUBLIC_SITE_DESCRIPTION: "A powerful web application for processing images"
+          NEXT_PUBLIC_SITE_URL: "https://example.com"
+          CLEANUP_API_KEY: "test-api-key-for-ci"
+
+      - name: Start application
+        run: pnpm start &
+        env:
+          PORT: 3000
+
+      - name: Wait for application to start
+        run: |
+          echo "Waiting for application to start..."
+          timeout 30 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 1; done'
+          echo "Application started"
+
+      - name: Run accessibility tests
+        run: |
+          npx pa11y-ci --config .pa11yci.json
