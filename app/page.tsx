@@ -634,23 +634,29 @@ export default function ImageProcessor() {
         ctx.fillStyle = "white"
         ctx.fillRect(0, 0, 1500, 1500)
 
-        // Determine if image has white border
-        const hasBorder = detectWhiteBorder(img, ctx)
-        addLog(`Image border detection: ${hasBorder ? "Has white border" : "No white border"}`)
+        // Determine if image has white background
+        const hasWhiteBackground = detectWhiteBorder(img, ctx)
+        addLog(`Image background detection: ${hasWhiteBackground ? "White background" : "No white background"}`)
 
-        // Process image based on orientation and border
-        if (hasBorder) {
-          // For images with white border, center with 200px borders
-          const maxDimension = Math.min(1100, img.width, img.height) // 1500 - (200*2) = 1100
-          const scale = maxDimension / Math.max(img.width, img.height)
+        // Process image based on orientation and background
+        if (hasWhiteBackground) {
+          // For small objects on white backgrounds, use more padding
+          // Calculate the actual object size by estimating non-white area
+          const objectSize = Math.max(img.width, img.height)
+          const padding = 300 // Increased padding for small objects
+          const maxSize = 1500 - (padding * 2)
+          
+          // Scale the image to fit within the padded area
+          const scale = maxSize / objectSize
           const newWidth = img.width * scale
           const newHeight = img.height * scale
           const x = (1500 - newWidth) / 2
           const y = (1500 - newHeight) / 2
-          addLog(`Resizing with border: ${newWidth}x${newHeight}, position: (${x}, ${y})`)
+          
+          addLog(`Resizing with padding: ${newWidth}x${newHeight}, position: (${x}, ${y})`)
           ctx.drawImage(img, x, y, newWidth, newHeight)
         } else {
-          // For images without border
+          // For images without white background
           if (img.width === img.height) {
             // Square image
             addLog("Processing as square image")
@@ -701,46 +707,57 @@ export default function ImageProcessor() {
         return false
       }
 
-      tempCtx.drawImage(img, 0, 0)
+      // Draw the image on the temporary canvas
+      tempCtx.drawImage(img, 0, 0, img.width, img.height)
 
-      // Sample pixels from the edges
-      const topRow = tempCtx.getImageData(0, 0, img.width, 1).data
-      const bottomRow = tempCtx.getImageData(0, img.height - 1, img.width, 1).data
-      const leftCol = tempCtx.getImageData(0, 0, 1, img.height).data
-      const rightCol = tempCtx.getImageData(img.width - 1, 0, 1, img.height).data
-
-      // Check if most of the edge pixels are white
-      const isWhitePixel = (r: number, g: number, b: number) => r > 240 && g > 240 && b > 240
-
+      // Sample more pixels from the edges for better detection
+      const sampleSize = Math.max(10, Math.floor(Math.min(img.width, img.height) * 0.05))
+      
+      // Check if the image has a predominantly white background
+      // Sample pixels from various parts of the image, not just the edges
       let whitePixelCount = 0
       let totalPixels = 0
-
-      const checkPixels = (data: Uint8ClampedArray) => {
-        for (let i = 0; i < data.length; i += 4) {
+      
+      // Sample from edges and interior
+      const regions = [
+        // Edges
+        { x: 0, y: 0, width: img.width, height: sampleSize }, // top
+        { x: 0, y: img.height - sampleSize, width: img.width, height: sampleSize }, // bottom
+        { x: 0, y: sampleSize, width: sampleSize, height: img.height - (2 * sampleSize) }, // left
+        { x: img.width - sampleSize, y: sampleSize, width: sampleSize, height: img.height - (2 * sampleSize) }, // right
+        
+        // Sample from center area too
+        { x: img.width * 0.25, y: img.height * 0.25, width: img.width * 0.5, height: img.height * 0.5 }
+      ]
+      
+      for (const region of regions) {
+        const imageData = tempCtx.getImageData(region.x, region.y, region.width, region.height)
+        const data = imageData.data
+        
+        for (let i = 0; i < data.length; i += 16) { // Sample every 4th pixel for performance
           const r = data[i]
           const g = data[i + 1]
           const b = data[i + 2]
-
-          if (isWhitePixel(r, g, b)) {
+          const a = data[i + 3]
+          
+          // Consider transparent pixels as white too
+          if ((r > 240 && g > 240 && b > 240) || a < 50) {
             whitePixelCount++
           }
           totalPixels++
         }
       }
-
-      checkPixels(topRow)
-      checkPixels(bottomRow)
-      checkPixels(leftCol)
-      checkPixels(rightCol)
-
-      // If more than 70% of edge pixels are white, consider it has a white border
+      
+      // If more than 85% of sampled pixels are white, consider it has a white background
       const whiteRatio = whitePixelCount / totalPixels
-      addLog(`Border detection: ${whitePixelCount}/${totalPixels} white pixels (${(whiteRatio * 100).toFixed(2)}%)`)
-      return whiteRatio > 0.7
+      addLog(`Background detection: ${whitePixelCount}/${totalPixels} white pixels (${(whiteRatio * 100).toFixed(2)}%)`)
+      
+      // For small objects on white backgrounds, we need a higher threshold
+      return whiteRatio > 0.85
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
-      addLog(`Error in border detection: ${errorMessage}`)
-      console.error("Error detecting white border:", error)
+      addLog(`Error in background detection: ${errorMessage}`)
+      console.error("Error detecting white background:", error)
       return false
     }
   }
