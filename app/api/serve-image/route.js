@@ -3,6 +3,12 @@ import { readFile } from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
 
+/**
+ * API route handler for serving images from the uploads directory
+ * @param {Request} request - The incoming HTTP request
+ * @returns {Promise<NextResponse>} Response containing the image file or error
+ * @throws {Error} If file cannot be read or doesn't exist
+ */
 export async function GET(request) {
   try {
     // Get the image filename from the URL

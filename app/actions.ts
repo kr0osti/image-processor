@@ -12,6 +12,13 @@ export interface ImageMetadata {
   filename: string;
 }
 
+/**
+ * Fetches and extracts image URLs from a web page
+ * @param {string} url - The URL of the web page to scrape
+ * @param {string} [customBaseUrl] - Optional base URL for resolving relative paths
+ * @returns {Promise<{logs: string[], images: ImageMetadata[]}>} Logs and extracted image metadata
+ * @throws {Error} If fetching or parsing fails
+ */
 export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
   const logs: string[] = []
   const imageMetadata: ImageMetadata[] = []

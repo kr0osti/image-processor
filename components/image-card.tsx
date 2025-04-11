@@ -1,10 +1,25 @@
-export function ImageCard({ image, onDelete }) {
+import Image from 'next/image';
+import { Trash as TrashIcon } from 'lucide-react';
+
+// Define the image type
+interface ImageProps {
+  id: string;
+  url: string;
+  alt?: string;
+}
+
+interface ImageCardProps {
+  image: ImageProps;
+  onDelete: (id: string) => void;
+}
+
+export function ImageCard({ image, onDelete }: ImageCardProps) {
   return (
     <div className="relative group">
-      <Image 
-        src={image.url} 
+      <Image
+        src={image.url}
         alt={image.alt || "Processed image"} // Meaningful alt text
-        width={300} 
+        width={300}
         height={300}
         className="object-cover rounded-md"
         loading="lazy"
