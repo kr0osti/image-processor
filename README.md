@@ -173,6 +173,28 @@ pnpm build
 pnpm start
 ```
 
+## 🔄 CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+### CI Workflows
+
+- **CI**: Builds and tests the application on every push and pull request
+- **Test**: Runs linting and tests on every push and pull request
+- **Security Scan**: Performs security scanning using Snyk and CodeQL
+- **Accessibility Testing**: Ensures the application meets WCAG accessibility standards
+- **Docker Build**: Builds Docker images for both the main app and cleanup service
+
+### CD Workflows
+
+- **CD**: Pushes Docker images to GitHub Container Registry on main branch pushes and tags
+- **Deploy to Staging**: Automatically deploys to the staging environment on pushes to the develop branch
+- **Deploy to Production**: Deploys to production when a new release is published
+
+### Automated Maintenance
+
+- **Dependabot**: Automatically creates PRs for dependency updates (npm, GitHub Actions, Docker)
+
 ## 🤝 Contributing
 
 Contributions are welcome! Here's how you can help:
