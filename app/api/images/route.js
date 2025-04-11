@@ -17,6 +17,11 @@ import { cleanupOldUploads } from '@/app/utils/cleanup';
 })();
 
 // Ensure uploads directory exists
+/**
+ * Ensures the uploads directory exists and is writable
+ * @returns {Promise<string>} Path to the uploads directory
+ * @throws {Error} If directory cannot be created or is not writable
+ */
 async function ensureUploadsDir() {
   const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
   try {
@@ -45,6 +50,12 @@ async function ensureUploadsDir() {
   }
 }
 
+/**
+ * API route handler for processing and saving images
+ * @param {Request} request - The incoming HTTP request
+ * @returns {Promise<NextResponse>} JSON response with processing results
+ * @throws {Error} If image processing fails
+ */
 export async function POST(request) {
   try {
     const contentType = request.headers.get('content-type') || '';

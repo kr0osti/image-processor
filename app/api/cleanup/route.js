@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { cleanupOldUploads } from '@/app/utils/cleanup';
 
+/**
+ * API route handler for triggering cleanup of old uploads
+ * @param {Request} request - The incoming HTTP request
+ * @returns {Promise<NextResponse>} JSON response with cleanup results
+ * @throws {Error} If cleanup process fails
+ */
 export async function GET(request) {
   try {
     // Get the API key from the request (for security)

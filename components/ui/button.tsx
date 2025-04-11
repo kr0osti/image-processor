@@ -33,17 +33,46 @@ const buttonVariants = cva(
   }
 )
 
+/**
+ * Props interface for the Button component
+ * Extends both the standard HTML button element attributes and the variant props
+ *
+ * @interface ButtonProps
+ */
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
+  /**
+   * When true, the button will render as its child component but with the button styles
+   * This is useful for rendering button-styled links or other interactive elements
+   */
   asChild?: boolean
 }
 
+/**
+ * Button component with enhanced accessibility and styling options
+ *
+ * This component provides a consistent button interface with various style variants
+ * and accessibility features built-in.
+ *
+ * @component
+ */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  /**
+   * @param {object} props - Component props
+   * @param {string} [props.className] - Additional CSS classes to apply
+   * @param {string} [props.variant] - Visual style variant of the button
+   * @param {string} [props.size] - Size variant of the button
+   * @param {boolean} [props.asChild=false] - When true, renders children with button styles
+   * @param {string} [props.type="button"] - HTML button type attribute
+   * @param {React.Ref<HTMLButtonElement>} ref - Forwarded ref
+   * @returns {JSX.Element} Rendered button element
+   */
+  ({ className, variant, size, asChild = false, type = "button", ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
     return (
       <Comp
+        type={type}
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         {...props}

@@ -1,5 +1,11 @@
 'use server'
 
+/**
+ * Server action to process images from various sources
+ * @param {FormData} formData - Form data containing image URLs, files, or web URL
+ * @returns {Promise<{success: boolean, message: string, images: Array}>} Processing results
+ * @throws {Error} If image processing fails
+ */
 export async function processImages(formData) {
   try {
     // Extract image data from the form
