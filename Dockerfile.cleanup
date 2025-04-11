@@ -9,38 +9,15 @@ RUN apk add --no-cache curl
 COPY package.json pnpm-lock.yaml ./
 COPY app/utils/cleanup.js ./app/utils/
 COPY app/api/cleanup/route.js ./app/api/cleanup/
+COPY cleanup.sh ./
 
 # Install dependencies
 RUN npm install -g pnpm && \
-    pnpm install --prod
-
-# Create a simple script to run the cleanup service
-RUN echo '#!/bin/sh
-
-# Function to run cleanup
-run_cleanup() {
-  echo "Running cleanup at $(date)"
-  RESPONSE=$(curl -s -w "\n%{http_code}" "http://app:3000/api/cleanup?key=$CLEANUP_API_KEY")
-  HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-  BODY=$(echo "$RESPONSE" | sed "$d")
-
-  if [ "$HTTP_CODE" = "200" ]; then
-    echo "Cleanup successful: $BODY"
-  else
-    echo "Cleanup failed with status $HTTP_CODE: $BODY"
-  fi
-}
-
-# Main loop
-while true; do
-  run_cleanup
-  echo "Sleeping for 60 seconds..."
-  sleep 60
-done' > /app/cleanup.sh && \
-chmod +x /app/cleanup.sh
+    pnpm install --prod && \
+    chmod +x /app/cleanup.sh
 
 # Set environment variables
 ENV NODE_ENV=production
 
 # Run the cleanup script
-CMD ["/app/cleanup.sh"]
+CMD ["/bin/sh", "/app/cleanup.sh"]
