@@ -16,17 +16,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
           run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
 
       # This step is important to ensure pnpm is in the PATH
       - name: Setup pnpm path
@@ -54,9 +54,6 @@ jobs:
           timeout 30 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 1; done'
           echo "Application started"
 
-      - name: Install pa11y-ci
-        run: npm install -g pa11y-ci
-
       - name: Run accessibility tests
         run: |
-          pa11y-ci --config .pa11yci.json
+          npx --yes pa11y-ci --config .pa11yci.json
