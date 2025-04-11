@@ -6,25 +6,10 @@ import { Check } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-/**
- * Checkbox component with enhanced accessibility features
- *
- * This component provides a styled checkbox input that follows accessibility best practices
- * and integrates with the design system.
- *
- * @component
- */
 const Checkbox = React.forwardRef<
   React.ElementRef<typeof CheckboxPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>
->(
-  /**
-   * @param {object} props - Component props
-   * @param {string} [props.className] - Additional CSS classes to apply
-   * @param {React.Ref<React.ElementRef<typeof CheckboxPrimitive.Root>>} ref - Forwarded ref
-   * @returns {JSX.Element} Rendered checkbox element
-   */
-  ({ className, ...props }, ref) => (
+>(({ className, ...props }, ref) => (
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
@@ -36,7 +21,7 @@ const Checkbox = React.forwardRef<
     <CheckboxPrimitive.Indicator
       className={cn("flex items-center justify-center text-current")}
     >
-      <Check className="h-4 w-4" aria-hidden="true" />
+      <Check className="h-4 w-4" />
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
 ))

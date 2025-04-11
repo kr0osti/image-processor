@@ -68,12 +68,7 @@ export default function ImageProcessor() {
   const [customSizeEnabled, setCustomSizeEnabled] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
 
-  /**
-   * Copies an image URL to the clipboard
-   *
-   * @param {string} dataUrl - The URL of the image to copy
-   * @returns {void}
-   */
+  // Add this function to copy image URL to clipboard
   const copyImageUrl = (dataUrl: string) => {
     if (!isBrowser) {
       addLog("Cannot copy URL in server context")
@@ -122,16 +117,6 @@ export default function ImageProcessor() {
   }
 
   // Add this effect to update filtered images when size filter changes
-  /**
-   * Effect hook to update filtered images based on size criteria
-   * 
-   * This effect runs when the fetchedImages, imageMetadata, sizeFilter, minWidth, minHeight, or customSizeEnabled state changes.
-   * It filters the images based on the selected size criteria and custom dimensions if enabled.
-   * The filtered results are then set to the filteredImages state and a log message is added.
-   * 
-   * @effect
-   * @dependencies [fetchedImages, imageMetadata, sizeFilter, minWidth, minHeight, customSizeEnabled]
-   */
   useEffect(() => {
     if (fetchedImages.length > 0 && imageMetadata.length > 0) {
       const filtered = imageMetadata
@@ -156,27 +141,13 @@ export default function ImageProcessor() {
     }
   }, [fetchedImages, imageMetadata, sizeFilter, minWidth, minHeight, customSizeEnabled])
 
-  /**
-   * Effect hook to process images when imageUrls change
-   * 
-   * This effect runs whenever the imageUrls state is updated.
-   * If there are any image URLs in the array, it triggers the processImages function.
-   * 
-   * @effect
-   * @dependencies [imageUrls]
-   */
+  // Process images when imageUrls change
   useEffect(() => {
     if (imageUrls.length > 0) {
       processImages(imageUrls)
     }
   }, [imageUrls])
 
-  /**
-   * Adds a log message to the console when debug mode is enabled
-   *
-   * @param {string} message - The message to log
-   * @returns {void}
-   */
   const addLog = (message: string) => {
     // Check if DEBUG is enabled - add more explicit logging to debug the issue
     console.log(`Debug setting: ${process.env.NEXT_PUBLIC_DEBUG}`)
@@ -186,12 +157,6 @@ export default function ImageProcessor() {
     }
   }
 
-  /**
-   * Handles the form submission to fetch images from a URL
-   *
-   * @param {React.FormEvent} e - The form submission event
-   * @returns {Promise<void>}
-   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!url) return
@@ -247,19 +212,11 @@ export default function ImageProcessor() {
     }
   }
 
+  // Remove the handleDirectImageSubmit function
+  const handleDirectImageSubmit = (e: React.FormEvent) => {
+    // This entire function can be removed
+  }
 
-  /**
-   * Processes an HTML image tag to create a placeholder image
-   *
-   * This function takes an HTML image element and its dimensions, creates a canvas-based
-   * placeholder image with the same dimensions (up to a maximum size), and includes
-   * relevant information such as dimensions, alt text, and source URL.
-   *
-   * @param {HTMLImageElement} imgElement - The HTML image element to process
-   * @param {number} width - The width of the image
-   * @param {number} height - The height of the image
-   * @returns {void}
-   */
   const processHtmlImageTag = (imgElement: HTMLImageElement, width: number, height: number) => {
     addLog("Creating placeholder image from HTML tag dimensions")
 
@@ -324,15 +281,6 @@ export default function ImageProcessor() {
     processPlaceholderImage(dataUrl, width, height)
   }
 
-  /**
-   * Creates a placeholder image for failed image loads
-   *
-   * Generates a visual placeholder with an image icon, filename, and error information
-   * when an image fails to load due to CORS or access restrictions.
-   *
-   * @param {string} imageUrl - The URL of the image that failed to load
-   * @returns {Promise<string>} A Promise that resolves to a data URL of the generated placeholder image
-   */
   const createPlaceholderForFailedImage = (imageUrl: string): Promise<string> => {
     if (!isBrowser) return Promise.resolve('')
 
@@ -411,17 +359,6 @@ export default function ImageProcessor() {
     })
   }
 
-  /**
-   * Processes a placeholder image to fit the standard 1500x1500 canvas
-   *
-   * Takes a data URL of a placeholder image and renders it on the canvas with proper
-   * positioning based on the original image dimensions (portrait, landscape, or square).
-   *
-   * @param {string} dataUrl - The data URL of the placeholder image
-   * @param {number} width - The original width of the image
-   * @param {number} height - The original height of the image
-   * @returns {void}
-   */
   const processPlaceholderImage = (dataUrl: string, width: number, height: number) => {
     // Create a new canvas for the final 1500x1500 image
     const canvas = canvasRef.current
@@ -479,12 +416,6 @@ export default function ImageProcessor() {
     img.src = dataUrl
   }
 
-  /**
-   * Handles file upload from the input element
-   *
-   * @param {React.ChangeEvent<HTMLInputElement>} e - The file input change event
-   * @returns {void}
-   */
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files)
@@ -510,13 +441,6 @@ export default function ImageProcessor() {
     }
   }
 
-  /**
-   * Resolves a relative URL to an absolute URL using a base URL
-   *
-   * @param {string} url - The URL to resolve (can be relative or absolute)
-   * @param {string} base - The base URL to use for resolving relative URLs
-   * @returns {string} The resolved absolute URL
-   */
   const resolveUrl = (url: string, base: string): string => {
     try {
       // If it's already an absolute URL, return it
@@ -532,12 +456,7 @@ export default function ImageProcessor() {
     }
   }
 
-  /**
-   * Converts a data URL to a real URL by sending it to the server
-   * 
-   * @param {string} dataUrl - The data URL to convert
-   * @returns {Promise<string | null>} A promise that resolves to the real URL or null if conversion fails
-   */
+  // Update the function that handles the image URL
   const convertDataUrlToRealUrl = async (dataUrl: string): Promise<string | null> => {
     try {
       const response = await fetch('/api/images', {
@@ -566,12 +485,6 @@ export default function ImageProcessor() {
     }
   }
 
-  /**
-   * Processes a list of image URLs, converting them to 1500x1500 images
-   *
-   * @param {string[]} urls - Array of image URLs to process
-   * @returns {Promise<void>}
-   */
   const processImages = async (urls: string[]) => {
     setProcessing(true)
     addLog(`Starting to process ${urls.length} images`)
@@ -623,12 +536,6 @@ export default function ImageProcessor() {
     }
   }
 
-  /**
-   * Processes a placeholder image to fit the standard 1500x1500 canvas
-   *
-   * @param {string} dataUrl - The data URL of the placeholder image to process
-   * @returns {Promise<string | null>} A Promise that resolves to the processed image's data URL, or null if processing failed
-   */
   const processPlaceholderAsImage = (dataUrl: string): Promise<string | null> => {
     if (!isBrowser) return Promise.resolve(null)
 
@@ -680,15 +587,6 @@ export default function ImageProcessor() {
     })
   }
 
-  /**
-   * Returns a proxied URL for the given image URL
-   * 
-   * This function checks if the provided URL is a remote URL that needs to be proxied.
-   * It returns the original URL for data URLs and blob URLs, and a proxied URL for remote URLs.
-   * 
-   * @param {string} imageUrl - The original image URL
-   * @returns {string} The proxied URL or the original URL if no proxy is needed
-   */
   const getProxiedImageUrl = (imageUrl: string): string => {
     // Only proxy remote URLs, not data URLs or object URLs
     if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
@@ -699,22 +597,6 @@ export default function ImageProcessor() {
     return `/api/proxy?url=${encodeURIComponent(imageUrl)}`;
   };
 
-  /**
-   * Processes an image to standardize its size and format for the catalog
-   *
-   * This function loads an image from a URL, detects if it has a white background,
-   * and resizes/positions it on a 1500x1500 canvas with appropriate padding.
-   * Different processing is applied based on the image's aspect ratio and background.
-   *
-   * The function handles:
-   * - CORS issues with cross-origin images
-   * - Timeout for images that fail to load
-   * - Different processing for images with/without white backgrounds
-   * - Different processing for square, landscape, and portrait images
-   *
-   * @param {string} imageUrl - The URL of the image to process
-   * @returns {Promise<string | null>} A Promise that resolves to the processed image's data URL, or null if processing failed
-   */
   const processImageWithCanvas = (imageUrl: string): Promise<string | null> => {
     if (!isBrowser) return Promise.resolve(null)
 
@@ -813,24 +695,6 @@ export default function ImageProcessor() {
     })
   }
 
-  /**
-   * Detects if an image has a predominantly white background
-   *
-   * This function analyzes an image to determine if it has a white background by
-   * sampling pixels from various regions of the image (edges and center). It creates
-   * a temporary canvas to perform the analysis without modifying the original image.
-   *
-   * The detection works by:
-   * 1. Creating a temporary canvas with the same dimensions as the image
-   * 2. Sampling pixels from the edges and center of the image
-   * 3. Counting pixels that are either white (RGB > 240) or transparent (alpha < 50)
-   * 4. Calculating the ratio of white pixels to total sampled pixels
-   * 5. Considering the image to have a white background if more than 85% of pixels are white
-   *
-   * @param {HTMLImageElement} img - The image element to analyze
-   * @param {CanvasRenderingContext2D} ctx - The canvas context (not used in the function but kept for API consistency)
-   * @returns {boolean} True if the image has a white background, false otherwise
-   */
   const detectWhiteBorder = (img: HTMLImageElement, ctx: CanvasRenderingContext2D): boolean => {
     try {
       // Create a temporary canvas to analyze the image
@@ -898,16 +762,6 @@ export default function ImageProcessor() {
     }
   }
 
-  /**
-   * Downloads a processed image to the user's device
-   *
-   * Creates a temporary anchor element, sets its href to the data URL,
-   * and triggers a download with a filename based on the index.
-   *
-   * @param {string} dataUrl - The data URL of the image to download
-   * @param {number} index - The index of the image (used for filename)
-   * @returns {void}
-   */
   const downloadImage = (dataUrl: string, index: number) => {
     const link = document.createElement("a")
     link.href = dataUrl
@@ -918,14 +772,6 @@ export default function ImageProcessor() {
     addLog(`Downloaded image ${index}`)
   }
 
-  /**
-   * Downloads all processed images individually
-   * 
-   * This function iterates through all processed images and triggers a download for each one.
-   * Downloads are staggered with a 500ms delay between each to prevent overwhelming the browser.
-   * 
-   * @returns {void}
-   */
   const downloadAllImages = () => {
     if (processedImages.length === 0) return
 
@@ -937,18 +783,7 @@ export default function ImageProcessor() {
     })
   }
 
-  /**
-   * Creates and downloads a zip file containing all processed images
-   *
-   * Converts all processed image data URLs to blobs, adds them to a zip file,
-   * and triggers a download of the combined archive. This is more efficient
-   * than downloading multiple individual files, especially for larger sets of images.
-   *
-   * The function handles data URL parsing, blob creation, zip file generation,
-   * and browser download triggering. It also manages processing state and error handling.
-   *
-   * @returns {Promise<void>} A promise that resolves when the zip file has been created and download initiated
-   */
+  // Add this function after the downloadAllImages function
   const downloadAsZip = async () => {
     if (processedImages.length === 0) return
 
@@ -1006,16 +841,6 @@ export default function ImageProcessor() {
     }
   }
 
-  /**
-   * Deletes all files and resets related state
-   * 
-   * This function performs the following actions:
-   * 1. Cleans up object URLs to prevent memory leaks
-   * 2. Resets all file-related state variables
-   * 3. Logs the deletion action
-   * 
-   * @returns {void}
-   */
   const deleteAllFiles = () => {
     // Clean up object URLs
     imageUrls.forEach((url) => {
@@ -1034,15 +859,6 @@ export default function ImageProcessor() {
     addLog("All files deleted")
   }
 
-  /**
-   * Processes the selected images
-   * 
-   * This function checks if any images are selected, sets an error if none are,
-   * and processes the selected images by updating the imageUrls state.
-   * It also logs the number of images being processed.
-   * 
-   * @returns {void}
-   */
   const processSelectedImages = () => {
     if (selectedImages.length === 0) {
       setError("Please select at least one image to process")
@@ -1054,32 +870,12 @@ export default function ImageProcessor() {
     setImageUrls(selectedImages)
   }
 
-  /**
-   * Toggles the selection state of an individual image
-   *
-   * When an image is clicked, this function either adds it to the selection
-   * if it wasn't already selected, or removes it from the selection if it was.
-   * This allows users to build a custom selection of images for processing.
-   *
-   * @param {string} imageUrl - The URL of the image to toggle selection for
-   * @returns {void}
-   */
   const toggleImageSelection = (imageUrl: string) => {
     setSelectedImages((prev) =>
       prev.includes(imageUrl) ? prev.filter((url) => url !== imageUrl) : [...prev, imageUrl],
     )
   }
 
-  /**
-   * Toggles selection of all filtered images
-   *
-   * When called, this function either selects all currently filtered images
-   * or deselects all images if all filtered images are already selected.
-   * This provides a convenient way for users to quickly select or deselect
-   * all images that match their current filter criteria.
-   *
-   * @returns {void}
-   */
   const selectAllImages = () => {
     if (filteredImages.length === 0) return
 
@@ -1094,22 +890,7 @@ export default function ImageProcessor() {
     }
   }
 
-  /**
-   * Categorizes an image into size categories based on dimensions
-   *
-   * Analyzes the width and height of an image and classifies it into one of three
-   * size categories: small, medium, or large. This classification is used for filtering
-   * and organizing images in the UI.
-   *
-   * The size categories are determined as follows:
-   * - Small: Area < 90,000 pixels (e.g., 300x300 or smaller)
-   * - Medium: Area between 90,000 and 360,000 pixels
-   * - Large: Area > 360,000 pixels (e.g., 600x600 or larger)
-   *
-   * @param {number} [width] - The width of the image in pixels
-   * @param {number} [height] - The height of the image in pixels
-   * @returns {'small' | 'medium' | 'large' | 'unknown'} The size category of the image
-   */
+  // Add this function to determine image size category
   const determineImageSize = (width?: number, height?: number): 'small' | 'medium' | 'large' | 'unknown' => {
     if (!width || !height) return 'unknown'
 
@@ -1125,18 +906,6 @@ export default function ImageProcessor() {
   }
 
   // Add this function to load image sizes
-  /**
-   * Loads and determines the sizes of images from given URLs
-   * 
-   * This function iterates through an array of image URLs, loads each image,
-   * determines its size category, and updates the imageMetadata state with
-   * the width, height, and size category of each image.
-   * 
-   * It also keeps track of how many images have been loaded and logs a summary
-   * of image sizes once all images have been processed.
-   * 
-   * @param {string[]} urls - An array of image URLs to process
-   */
   const loadImageSizes = (urls: string[]) => {
     let loaded = 0
 
@@ -1182,16 +951,6 @@ export default function ImageProcessor() {
   }
 
   // Add this function to toggle size filter
-  /**
-   * Toggles the size filter for image selection
-   * 
-   * This function updates the sizeFilter state by either adding or removing
-   * the specified size. If the size is already in the filter, it is removed;
-   * otherwise, it is added.
-   * 
-   * @param {('small' | 'medium' | 'large' | 'unknown')} size - The size category to toggle
-   * @returns {void}
-   */
   const toggleSizeFilter = (size: 'small' | 'medium' | 'large' | 'unknown') => {
     setSizeFilter(prev =>
       prev.includes(size)

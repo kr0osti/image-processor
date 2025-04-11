@@ -1,4 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createRateLimiter } from '../../utils/rate-limit.js';
+
+// Create a rate limiter for the proxy endpoint
+// Allow 500 requests per minute per IP address
+const rateLimiter = createRateLimiter({
+  limit: 500,
+  windowMs: 60 * 1000, // 1 minute
+  message: 'Too many image proxy requests. Please try again later.'
+});
 
 /**
  * API route handler for proxying images from external sources
@@ -7,11 +16,18 @@ import { NextRequest, NextResponse } from 'next/server';
  * the application's domain to avoid CORS issues. It adds appropriate headers
  * to make the images accessible to the client-side code.
  *
+ * Rate limited to 500 requests per minute per IP address.
+ *
  * @param {NextRequest} request - The incoming HTTP request
  * @returns {Promise<NextResponse>} The proxied image or error response
  * @throws {Error} If the image cannot be fetched or processed
  */
 export async function GET(request: NextRequest) {
+  // Check rate limit before processing the request
+  const rateLimitResponse = await rateLimiter(request);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
   const url = request.nextUrl.searchParams.get('url');
 
   if (!url) {

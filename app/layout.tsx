@@ -10,8 +10,8 @@ const inter = Inter({ subsets: ["latin"] })
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
+  maximumScale: 1,
+  userScalable: false,
   themeColor: process.env.NEXT_PUBLIC_SITE_THEME_COLOR || '#000000',
 }
 
@@ -38,8 +38,6 @@ export const metadata: Metadata = {
   },
 }
 
-import { SkipLink } from "@/components/skip-link"
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -49,10 +47,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <SkipLink />
-          <main id="main-content">
-            {children}
-          </main>
+          {children}
           <DebugInfo />
         </ThemeProvider>
       </body>
