@@ -11,9 +11,6 @@ on:
 jobs:
   accessibility:
     runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/playwright:v1.42.1-jammy
-      options: --ipc=host
 
     steps:
       - name: Checkout repository
@@ -57,8 +54,13 @@ jobs:
           timeout 30 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 1; done'
           echo "Application started"
 
-      - name: Install Playwright
-        run: npm install -g @playwright/test
+      - name: Install Playwright and browsers
+        run: |
+          # Install Playwright
+          npm install @playwright/test
+
+          # Install Playwright browsers with dependencies
+          npx playwright install --with-deps chromium
 
       - name: Run accessibility tests with Playwright
         continue-on-error: true  # Don't fail the workflow if accessibility tests fail
@@ -68,7 +70,10 @@ jobs:
           const { chromium } = require('@playwright/test');
 
           async function runAccessibilityTests() {
-            const browser = await chromium.launch();
+            const browser = await chromium.launch({
+              headless: true,
+              args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            });
             const context = await browser.newContext();
             const page = await context.newPage();
 
@@ -87,11 +92,74 @@ jobs:
               console.log(`Page title: ${await page.title()}`);
               console.log(`Found ${accessibilitySnapshot.children.length} elements in accessibility tree`);
 
-              // You can add more sophisticated checks here
+              // Check for common accessibility issues
+              const hasHeading = accessibilitySnapshot.children.some(node =>
+                node.role === 'heading' && (node.level === 1 || node.level === 2));
+              if (!hasHeading) {
+                console.warn(`WARNING: No heading (h1 or h2) found on ${url}`);
+              }
+
+              // Check for image alt text
+              const images = await page.$$('img');
+              for (let i = 0; i < images.length; i++) {
+                const alt = await images[i].getAttribute('alt');
+                if (alt === null || alt === '') {
+                  console.warn(`WARNING: Image without alt text found on ${url}`);
+                }
+              }
+
+              // Check for sufficient color contrast (basic check)
+              const lowContrastElements = await page.$$('[style*="color"]');
+              if (lowContrastElements.length > 0) {
+                console.log(`Found ${lowContrastElements.length} elements with custom colors (should be checked manually for contrast)`);
+              }
             }
 
+            // Generate a simple report
+            const fs = require('fs');
+            const reportData = {
+              timestamp: new Date().toISOString(),
+              results: []
+            };
+
+            for (const url of urls) {
+              await page.goto(url, { waitUntil: 'networkidle' });
+              const accessibilitySnapshot = await page.accessibility.snapshot();
+
+              const pageReport = {
+                url,
+                title: await page.title(),
+                elementsCount: accessibilitySnapshot.children.length,
+                issues: []
+              };
+
+              // Check for headings
+              const hasHeading = accessibilitySnapshot.children.some(node =>
+                node.role === 'heading' && (node.level === 1 || node.level === 2));
+              if (!hasHeading) {
+                pageReport.issues.push({ type: 'missing-heading', description: 'No heading (h1 or h2) found' });
+              }
+
+              // Check for image alt text
+              const images = await page.$$('img');
+              let missingAltCount = 0;
+              for (let i = 0; i < images.length; i++) {
+                const alt = await images[i].getAttribute('alt');
+                if (alt === null || alt === '') {
+                  missingAltCount++;
+                }
+              }
+              if (missingAltCount > 0) {
+                pageReport.issues.push({ type: 'missing-alt', description: `${missingAltCount} images without alt text` });
+              }
+
+              reportData.results.push(pageReport);
+            }
+
+            fs.writeFileSync('accessibility-report.json', JSON.stringify(reportData, null, 2));
+
             await browser.close();
-            console.log('Accessibility tests completed');
+            console.log('Accessibility tests completed. Report generated: accessibility-report.json');
           }
 
           runAccessibilityTests().catch(err => {
@@ -105,3 +173,11 @@ jobs:
             echo "::warning::Accessibility tests found issues. See the log for details."
             exit 0  # Don't fail the workflow
           }
+
+      - name: Upload accessibility report
+        if: always()  # Upload even if previous steps failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-report
+          path: accessibility-report.json
+          retention-days: 90
