@@ -202,7 +202,7 @@ export default function ImageProcessor() {
         addLog("Loading images to determine sizes...")
         loadImageSizes(result.imageUrls)
       }
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
       setError(`An error occurred while fetching the images: ${errorMessage}`)
       addLog(`Exception: ${errorMessage}`)
@@ -540,12 +540,14 @@ export default function ImageProcessor() {
       } else {
         throw new Error(data.message || 'Failed to save image');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // Check if this was an abort error (timeout)
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         addLog(`Request timed out after 60 seconds. The server might be overloaded or the image might be too large.`);
-      } else {
+      } else if (error instanceof Error) {
         addLog(`Error saving image to server: ${error.message}`);
+      } else {
+        addLog(`Error saving image to server: Unknown error`);
       }
       console.error('Error converting data URL to real URL:', error);
       return null;
@@ -587,8 +589,9 @@ export default function ImageProcessor() {
             addLog(`Failed to process image ${index + 1}`)
           }
         }
-      } catch (error) {
-        addLog(`Error processing image ${index + 1}: ${error}`)
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error"
+        addLog(`Error processing image ${index + 1}: ${errorMessage}`)
       }
     }
 
@@ -825,7 +828,7 @@ export default function ImageProcessor() {
 
       // For small objects on white backgrounds, we need a higher threshold
       return whiteRatio > 0.85
-    } catch (error) {
+    } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
       addLog(`Error in background detection: ${errorMessage}`)
       console.error("Error detecting white background:", error)
@@ -903,7 +906,7 @@ export default function ImageProcessor() {
       // Clean up
       URL.revokeObjectURL(link.href)
       addLog("Zip file created and download initiated")
-    } catch (error) {
+    } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
       addLog(`Error creating zip file: ${errorMessage}`)
       setError(`Failed to create zip file: ${errorMessage}`)

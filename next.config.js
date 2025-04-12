@@ -4,11 +4,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Increase API limits for handling large images
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-    responseLimit: '10mb',
+  experimental: {
+    serverComponentsExternalPackages: ['sharp'],
   },
   images: {
     remotePatterns: [
