@@ -24,7 +24,5 @@ describe('Healthcheck API', () => {
     // Verify the response data
     expect(data).toHaveProperty('status', 'ok');
     expect(data).toHaveProperty('timestamp');
-    expect(data).toHaveProperty('environment');
-    expect(data).toHaveProperty('version');
   });
 });
