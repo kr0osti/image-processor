@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: nextjs-image-processor-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NODE_OPTIONS=--max-old-space-size=4096
+      - NEXT_PUBLIC_DEBUG=true
+      - HOSTNAME=0.0.0.0
+      - NEXT_PUBLIC_SITE_NAME=NextJS Image Processor (Dev)
+      - NEXT_PUBLIC_SITE_DESCRIPTION=A powerful web application for processing images (Development)
+      - NEXT_PUBLIC_SITE_URL=http://localhost:3000
+      - NEXT_PUBLIC_SITE_THEME_COLOR=#000000
+      - NEXT_PUBLIC_SITE_BACKGROUND_COLOR=#ffffff
+      - CLEANUP_API_KEY=dev-api-key
+    volumes:
+      - ../app:/app/app
+      - ../public:/app/public
+      - ../node_modules:/app/node_modules
+      - ../custom-icons:/app/public/custom-icons
+      - ../public/uploads:/app/public/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/healthcheck || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  cleanup-cron:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cleanup
+    container_name: nextjs-image-cleanup-dev
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      - CLEANUP_API_KEY=dev-api-key
+    volumes:
+      - cleanup-logs:/var/log
+      - ../public/uploads:/app/public/uploads
+
+volumes:
+  cleanup-logs:

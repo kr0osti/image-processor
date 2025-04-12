@@ -13,7 +13,9 @@
     "test": "jest --config config/jest/jest.config.js",
     "test:watch": "jest --watch --config config/jest/jest.config.js",
     "test:coverage": "jest --coverage --config config/jest/jest.config.js",
-    "test:e2e": "playwright test --config config/playwright/playwright.config.ts"
+    "test:e2e": "playwright test --config config/playwright/playwright.config.ts",
+    "docker:dev": "docker-compose -f docker-compose-dev.yml up --build",
+    "docker:dev:down": "docker-compose -f docker-compose-dev.yml down"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
