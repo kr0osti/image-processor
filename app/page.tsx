@@ -963,7 +963,7 @@ export default function ImageProcessor() {
     <div className="container mx-auto py-10">
       <Card className="max-w-4xl mx-auto">
         <CardHeader>
-          <CardTitle>Image Processor</CardTitle>
+          <h1 className="text-2xl font-bold">Image Processor</h1>
           <CardDescription>Download and proccess images to 1500x1500px with appropriate positioning</CardDescription>
         </CardHeader>
         <CardContent>
@@ -1217,6 +1217,16 @@ export default function ImageProcessor() {
                     onChange={handleFileUpload}
                   />
                 </div>
+
+                <Button
+                  onClick={triggerFileInput}
+                  className="mt-4"
+                  role="button"
+                  aria-label="Upload Images"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Images
+                </Button>
 
                 {uploadedFiles.length > 0 && (
                   <div className="mt-4">
