@@ -64,7 +64,7 @@ jobs:
           chmod -R 777 public/uploads
 
       - name: Run linting
-        run: pnpm lint || true
+        run: pnpm lint --config config/eslint/.eslintrc.json || true
 
       - name: Run unit and API tests
         run: |
