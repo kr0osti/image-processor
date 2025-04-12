@@ -1,0 +1,60 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: development
+    container_name: nextjs-image-processor-dev
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:3000:3000"
+    env_file:
+      - ../.env
+    environment:
+      - NODE_ENV=development
+      - NODE_OPTIONS=${NODE_OPTIONS:-"--max-old-space-size=4096"}
+      - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG:-true}
+      - HOSTNAME=${HOSTNAME:-0.0.0.0}
+      - NEXT_PUBLIC_SITE_NAME=${NEXT_PUBLIC_SITE_NAME:-"NextJS Image Processor (Dev)"}
+      - NEXT_PUBLIC_SITE_DESCRIPTION=${NEXT_PUBLIC_SITE_DESCRIPTION:-"A powerful web application for processing images (Development)"}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_SITE_THEME_COLOR=${NEXT_PUBLIC_SITE_THEME_COLOR:-#000000}
+      - NEXT_PUBLIC_SITE_BACKGROUND_COLOR=${NEXT_PUBLIC_SITE_BACKGROUND_COLOR:-#ffffff}
+      - CLEANUP_API_KEY=${CLEANUP_API_KEY:-dev-api-key}
+    volumes:
+      - ../app:/app/app
+      - ../components:/app/components
+      - ../lib:/app/lib
+      - ../public:/app/public
+      - ../styles:/app/styles
+      - ../next.config.js:/app/next.config.js
+      - ../tsconfig.json:/app/tsconfig.json
+      - ../package.json:/app/package.json
+      - ../pnpm-lock.yaml:/app/pnpm-lock.yaml
+      - /app/node_modules
+      - ../public/uploads:/app/public/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/healthcheck || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  cleanup-cron:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cleanup
+    container_name: nextjs-image-cleanup-dev
+    restart: unless-stopped
+    depends_on:
+      - app
+    env_file:
+      - ../.env
+    environment:
+      - CLEANUP_API_KEY=${CLEANUP_API_KEY:-dev-api-key}
+    volumes:
+      - cleanup-logs:/var/log
+      - ../public/uploads:/app/public/uploads
+
+volumes:
+  cleanup-logs:

@@ -64,12 +64,14 @@ const rateLimiter = createRateLimiter({
  *
  * This endpoint processes and saves images from various sources including
  * data URLs, form uploads, and web URLs. It includes rate limiting to prevent abuse.
+ * The handler implements a 60-second timeout to prevent long-running requests.
  *
  * Rate limited to 300 requests per minute per IP address.
  *
  * @param {Request} request - The incoming HTTP request
  * @returns {Promise<NextResponse>} JSON response with processing results
  * @throws {Error} If image processing fails
+ * @timeout 60 seconds - The request will be terminated if it takes longer than 60 seconds
  */
 export async function POST(request) {
   // Check rate limit before processing the request
@@ -77,6 +79,20 @@ export async function POST(request) {
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
+
+  /**
+   * Set up a timeout mechanism for the request processing
+   * This prevents the request from hanging indefinitely and consuming server resources
+   * The timeout is set to 60 seconds, after which the request will be aborted
+   */
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      console.error('Request processing timed out after 60 seconds');
+      reject(new Error('Request processing timed out after 60 seconds'));
+    }, 60000);
+  });
+
   try {
     const contentType = request.headers.get('content-type') || '';
 
@@ -86,16 +102,29 @@ export async function POST(request) {
       const { dataUrl } = body;
 
       if (!dataUrl) {
+        // Clear the timeout since we're about to return
+        if (timeoutId) clearTimeout(timeoutId);
+
         return NextResponse.json({
           success: false,
           message: 'No data URL provided'
         }, { status: 400 });
       }
 
+      /**
+       * Log the size of the received data URL for debugging and monitoring
+       * This helps identify potential issues with large payloads
+       * Size is converted from bytes to kilobytes for readability
+       */
+      console.log(`Received data URL of size: ${Math.round(dataUrl.length / 1024)} KB`);
+
       // Extract the base64 data from the data URL
       const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
 
       if (!matches || matches.length !== 3) {
+        // Clear the timeout since we're about to return
+        if (timeoutId) clearTimeout(timeoutId);
+
         return NextResponse.json({
           success: false,
           message: 'Invalid data URL format'
@@ -134,6 +163,9 @@ export async function POST(request) {
         console.log(`File saved to: ${filePath}`);
         console.log(`Public URL should be: ${publicUrl}`);
 
+        // Clear the timeout since we're about to return successfully
+        if (timeoutId) clearTimeout(timeoutId);
+
         return NextResponse.json({
           success: true,
           message: 'Image saved successfully',
@@ -144,6 +176,10 @@ export async function POST(request) {
         });
       } catch (writeError) {
         console.error(`Error writing file: ${writeError.message}`);
+
+        // Clear the timeout since we're about to return
+        if (timeoutId) clearTimeout(timeoutId);
+
         return NextResponse.json({
           success: false,
           message: 'Failed to save image',
@@ -212,6 +248,9 @@ export async function POST(request) {
         });
       }
 
+      // Clear the timeout since we're about to return successfully
+      if (timeoutId) clearTimeout(timeoutId);
+
       return NextResponse.json({
         success: true,
         message: 'Images processed successfully',
@@ -220,6 +259,9 @@ export async function POST(request) {
     }
     // Handle unsupported content type
     else {
+      // Clear the timeout since we're about to return
+      if (timeoutId) clearTimeout(timeoutId);
+
       return NextResponse.json({
         success: false,
         message: 'Unsupported content type',
@@ -227,7 +269,23 @@ export async function POST(request) {
       }, { status: 400 });
     }
   } catch (error) {
+    // Clear the timeout to prevent memory leaks
+    if (timeoutId) clearTimeout(timeoutId);
+
     console.error('Error processing images:', error);
+
+    // Check if this is a timeout error
+    if (error.message.includes('timed out')) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Request timed out. The server took too long to process your request.',
+          error: error.message
+        },
+        { status: 504 } // Gateway Timeout
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

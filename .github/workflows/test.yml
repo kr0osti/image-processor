@@ -64,12 +64,12 @@ jobs:
           chmod -R 777 public/uploads
 
       - name: Run linting
-        run: pnpm lint || true
+        run: pnpm lint --config config/eslint/.eslintrc.json || true
 
       - name: Run unit and API tests
         run: |
           echo "Running tests with NODE_ENV=test-node"
-          NODE_ENV=test-node pnpm test -- --passWithNoTests --testEnvironment=node --detectOpenHandles --forceExit --no-cache
+          NODE_ENV=test-node pnpm test -- --passWithNoTests --testEnvironment=node --detectOpenHandles --forceExit --no-cache --testTimeout=70000
         env:
           NEXT_PUBLIC_SITE_NAME: "NextJS Image Processor"
           NEXT_PUBLIC_SITE_DESCRIPTION: "A powerful web application for processing images"

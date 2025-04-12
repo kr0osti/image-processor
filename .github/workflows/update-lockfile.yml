@@ -1,0 +1,43 @@
+name: Update pnpm-lock.yaml
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Run every Monday at midnight
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  update-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image and extract lockfile
+        run: |
+          cd docker
+          docker build -t lockfile-generator -f Dockerfile .. --target=base
+          CONTAINER_ID=$(docker create lockfile-generator)
+          docker cp $CONTAINER_ID:/tmp/pnpm-lock.yaml ../pnpm-lock.yaml
+          docker rm $CONTAINER_ID
+
+      - name: Check for changes
+        id: git-check
+        run: |
+          git diff --exit-code pnpm-lock.yaml || echo "changes=true" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        if: steps.git-check.outputs.changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update pnpm-lock.yaml for Dependabot compatibility"
+          title: "chore: update pnpm-lock.yaml for Dependabot compatibility"
+          body: |
+            This PR updates the pnpm-lock.yaml file to ensure compatibility with Dependabot.
+
+            The lockfile was regenerated using pnpm 8.15.1 in a Docker container to ensure consistency.
+          branch: update-pnpm-lockfile
+          base: main

@@ -3,17 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.0.0",
+    "pnpm": "8.15.1"
   },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:e2e": "playwright test"
+    "lint": "next lint --config config/eslint/.eslintrc.json",
+    "test": "jest --config config/jest/jest.config.js",
+    "test:watch": "jest --watch --config config/jest/jest.config.js",
+    "test:coverage": "jest --coverage --config config/jest/jest.config.js",
+    "test:e2e": "playwright test --config config/playwright/playwright.config.ts",
+    "docker:dev": "cd docker && docker-compose -f docker-compose-dev.yml up --build",
+    "docker:dev:down": "cd docker && docker-compose -f docker-compose-dev.yml down",
+    "update-lockfile": "./scripts/update-lockfile.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

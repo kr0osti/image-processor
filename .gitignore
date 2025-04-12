@@ -16,6 +16,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.swp
 
 # env files
 .env*
@@ -34,3 +35,17 @@ next-env.d.ts
 # uploaded files
 /public/uploads/*
 !public/uploads/.gitkeep
+
+# test scripts
+run-tests.sh
+run-tests-simple.sh
+run-tests-fix.sh
+run-fixed-tests.sh
+run-all-api-tests.sh
+run-cleanup-test.sh
+run-all-tests-fixed.sh
+run-simple-tests.sh
+run-final-tests.sh
+run-images-test.sh
+# Keep the main test script
+# docker-test.sh
