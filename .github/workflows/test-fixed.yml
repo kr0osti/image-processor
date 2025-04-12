@@ -1,0 +1,52 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      # This step is important to ensure pnpm is in the PATH
+      - name: Setup pnpm path
+        run: echo "$(pnpm -g bin)" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Create uploads directory
+        run: |
+          mkdir -p public/uploads
+          chmod -R 777 public/uploads
+
+      - name: Make scripts executable
+        run: |
+          chmod +x run-tests-ci.sh
+
+      - name: Run unit and API tests
+        run: ./run-tests-ci.sh
+        env:
+          NEXT_PUBLIC_SITE_NAME: "NextJS Image Processor"
+          NEXT_PUBLIC_SITE_DESCRIPTION: "A powerful web application for processing images"
+          NEXT_PUBLIC_SITE_URL: "https://example.com"
+          CLEANUP_API_KEY: "test-api-key-for-ci"

@@ -8,7 +8,7 @@ const createJestConfig = nextJest({
 // Add any custom config to be passed to Jest
 const customJestConfig = {
   setupFilesAfterEnv: [
-    process.env.NODE_ENV === 'test-node' ? './jest.node.setup.js' : './jest.setup.js',
+    process.env.NODE_ENV === 'test-node' ? '<rootDir>/config/jest/jest.node.setup.js' : '<rootDir>/config/jest/jest.setup.js',
   ],
   testEnvironment: 'jest-environment-jsdom',
   forceExit: true,
