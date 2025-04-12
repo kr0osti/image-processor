@@ -100,6 +100,12 @@ pnpm test:coverage
 pnpm test:e2e
 ```
 
+### Running tests locally
+
+```bash
+docker exec -it nextjs-image-processor-dev sh -c "cd /app && NODE_ENV=test-node npx jest __tests__/api/images.test.js --testEnvironment=node --detectOpenHandles --forceExit"
+```
+
 ## 📦 Dependency Management
 
 This project uses pnpm for dependency management. To update dependencies:
