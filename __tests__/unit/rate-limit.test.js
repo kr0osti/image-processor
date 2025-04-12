@@ -1,5 +1,19 @@
+/**
+ * @jest-environment node
+ */
+
+// Import modules
 import { createRateLimiter } from '../../app/utils/rate-limit';
 import { NextResponse } from 'next/server';
+
+// Mock setInterval to avoid open handles
+const originalSetInterval = global.setInterval;
+global.setInterval = jest.fn();
+
+// Restore setInterval after tests
+afterAll(() => {
+  global.setInterval = originalSetInterval;
+});
 
 // Mock NextResponse
 jest.mock('next/server', () => ({
@@ -51,7 +65,7 @@ describe('Rate Limiter', () => {
     // Third request should be blocked
     const req3 = { headers: { get: () => '127.0.0.1' } };
     const res3 = await rateLimiter(req3);
-    
+
     expect(res3).not.toBeNull();
     expect(NextResponse.json).toHaveBeenCalledWith(
       { error: 'Too many requests, please try again later.' },
@@ -81,7 +95,7 @@ describe('Rate Limiter', () => {
 
     // Second request should be blocked with custom message
     await rateLimiter({ headers: { get: () => '127.0.0.1' } });
-    
+
     expect(NextResponse.json).toHaveBeenCalledWith(
       { error: customMessage },
       expect.anything()
