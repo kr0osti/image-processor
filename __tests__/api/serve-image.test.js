@@ -5,8 +5,9 @@ import { existsSync } from 'fs';
 import path from 'path';
 
 // Mock fs and path modules
+const mockReadFile = jest.fn();
 jest.mock('fs/promises', () => ({
-  readFile: jest.fn(),
+  readFile: mockReadFile,
 }));
 
 jest.mock('fs', () => ({
@@ -79,7 +80,7 @@ describe('Serve Image API', () => {
 
     // Mock readFile to return a buffer
     const imageBuffer = Buffer.from('test image data');
-    readFile.mockResolvedValue(imageBuffer);
+    mockReadFile.mockResolvedValue(imageBuffer);
 
     // Create a mock request with a PNG filename
     const request = { url: 'http://localhost:3000/api/serve-image?file=test.png' };
@@ -105,7 +106,7 @@ describe('Serve Image API', () => {
 
     // Mock readFile to return a buffer
     const imageBuffer = Buffer.from('test image data');
-    readFile.mockResolvedValue(imageBuffer);
+    mockReadFile.mockResolvedValue(imageBuffer);
 
     // Create a mock request with a JPEG filename
     const request = { url: 'http://localhost:3000/api/serve-image?file=test.jpg' };
@@ -125,7 +126,7 @@ describe('Serve Image API', () => {
     existsSync.mockReturnValue(true);
 
     // Mock readFile to throw an error
-    readFile.mockRejectedValue(new Error('Test error'));
+    mockReadFile.mockRejectedValue(new Error('Test error'));
 
     // Create a mock request with a filename
     const request = { url: 'http://localhost:3000/api/serve-image?file=test.jpg' };

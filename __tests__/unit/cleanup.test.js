@@ -1,28 +1,22 @@
 import { cleanupOldUploads } from '../../app/utils/cleanup';
-import fs from 'fs';
+import * as fsPromises from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 
-// Mock fs and path modules
-jest.mock('fs', () => {
-  const originalModule = jest.requireActual('fs');
-  return {
-    ...originalModule,
-    existsSync: jest.fn(),
-    promises: {
-      readdir: jest.fn(),
-      stat: jest.fn(),
-      unlink: jest.fn().mockResolvedValue(undefined),
-    },
-  };
-});
+// Mock fs modules
+jest.mock('fs/promises', () => ({
+  readdir: jest.fn(),
+  stat: jest.fn(),
+  unlink: jest.fn().mockResolvedValue(undefined),
+}));
 
-jest.mock('path', () => {
-  const originalModule = jest.requireActual('path');
-  return {
-    ...originalModule,
-    join: jest.fn(),
-  };
-});
+jest.mock('fs', () => ({
+  existsSync: jest.fn(),
+}));
+
+jest.mock('path', () => ({
+  join: jest.fn(),
+}));
 
 // Mock console.log and console.error to avoid cluttering test output
 global.console.log = jest.fn();
@@ -40,12 +34,12 @@ describe('Cleanup Utility', () => {
     path.join.mockImplementation((...args) => args.join('/'));
 
     // Mock fs.existsSync to return true by default
-    fs.existsSync.mockReturnValue(true);
+    existsSync.mockReturnValue(true);
   });
 
   it('should return early if uploads directory does not exist', async () => {
     // Mock fs.existsSync to return false for this test
-    fs.existsSync.mockReturnValue(false);
+    existsSync.mockReturnValue(false);
 
     const result = await cleanupOldUploads();
 
@@ -79,8 +73,8 @@ describe('Cleanup Utility', () => {
     const result = await cleanupOldUploads(60 * 60 * 1000);
 
     // Verify that only file1.jpg was deleted
-    expect(fs.promises.unlink).toHaveBeenCalledTimes(1);
-    expect(fs.promises.unlink).toHaveBeenCalledWith('/test/path/public/uploads/file1.jpg');
+    expect(fsPromises.unlink).toHaveBeenCalledTimes(1);
+    expect(fsPromises.unlink).toHaveBeenCalledWith('/test/path/public/uploads/file1.jpg');
     expect(result).toEqual({ deleted: 1, errors: 0 });
   });
 
@@ -103,8 +97,8 @@ describe('Cleanup Utility', () => {
     const result = await cleanupOldUploads();
 
     // Verify that file2.png was deleted and an error was recorded for file1.jpg
-    expect(fs.promises.unlink).toHaveBeenCalledTimes(1);
-    expect(fs.promises.unlink).toHaveBeenCalledWith('/test/path/public/uploads/file2.png');
+    expect(fsPromises.unlink).toHaveBeenCalledTimes(1);
+    expect(fsPromises.unlink).toHaveBeenCalledWith('/test/path/public/uploads/file2.png');
     expect(result).toEqual({ deleted: 1, errors: 1 });
   });
 
@@ -140,8 +134,8 @@ describe('Cleanup Utility', () => {
     await cleanupOldUploads();
 
     // Verify that only file1.jpg was processed
-    expect(fs.promises.stat).toHaveBeenCalledTimes(1);
-    expect(fs.promises.stat).toHaveBeenCalledWith('/test/path/public/uploads/file1.jpg');
-    expect(fs.promises.stat).not.toHaveBeenCalledWith('/test/path/public/uploads/.gitkeep');
+    expect(fsPromises.stat).toHaveBeenCalledTimes(1);
+    expect(fsPromises.stat).toHaveBeenCalledWith('/test/path/public/uploads/file1.jpg');
+    expect(fsPromises.stat).not.toHaveBeenCalledWith('/test/path/public/uploads/.gitkeep');
   });
 });
