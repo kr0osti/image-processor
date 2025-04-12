@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.0.0",
+    "pnpm": "8.15.1"
   },
   "scripts": {
     "dev": "next dev",
@@ -14,8 +15,9 @@
     "test:watch": "jest --watch --config config/jest/jest.config.js",
     "test:coverage": "jest --coverage --config config/jest/jest.config.js",
     "test:e2e": "playwright test --config config/playwright/playwright.config.ts",
-    "docker:dev": "docker-compose -f docker-compose-dev.yml up --build",
-    "docker:dev:down": "docker-compose -f docker-compose-dev.yml down"
+    "docker:dev": "cd docker && docker-compose -f docker-compose-dev.yml up --build",
+    "docker:dev:down": "cd docker && docker-compose -f docker-compose-dev.yml down",
+    "update-lockfile": "./scripts/update-lockfile.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

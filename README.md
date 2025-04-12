@@ -76,7 +76,7 @@ chmod +x setup-permissions.sh
 ./setup-permissions.sh
 
 # Start the application with Docker Compose using the development configuration
-docker compose -f docker-compose.dev.yaml up -d
+cd docker && docker compose -f docker-compose-dev.yml up -d
 ```
 
 The application will be available at http://localhost:6060
@@ -128,8 +128,8 @@ The application consists of two Docker containers:
 
 The project includes two Docker Compose configurations:
 
-1. **docker-compose.yaml**: The default configuration that uses pre-built images from GitHub Container Registry
-2. **docker-compose.dev.yaml**: Development configuration that builds images locally
+1. **docker/docker-compose.yaml**: The default configuration that uses pre-built images from GitHub Container Registry
+2. **docker/docker-compose-dev.yml**: Development configuration that builds images locally
 
 ### 🛠️ Troubleshooting
 
@@ -197,14 +197,23 @@ This project uses pnpm for dependency management. The `pnpm-lock.yaml` file is r
 If you need to regenerate the lockfile:
 
 ```bash
-# Run the generate-lockfile script
-./generate-lockfile.sh
+# Use the provided script (recommended)
+pnpm update-lockfile
 
-# Or manually with pnpm
-pnpm install --lockfile-only
+# Or manually with Docker
+docker build -t lockfile-generator -f docker/Dockerfile . --target=base
+docker create --name lockfile-temp lockfile-generator
+docker cp lockfile-temp:/tmp/pnpm-lock.yaml ./pnpm-lock.yaml
+docker rm lockfile-temp
 ```
 
+This approach ensures that the lockfile is generated in a consistent environment with the correct pnpm version (8.15.1), making it compatible with Dependabot.
+
 Always commit the updated `pnpm-lock.yaml` file when adding or updating dependencies.
+
+#### Automatic Lockfile Updates
+
+A GitHub workflow runs weekly to automatically update the lockfile and create a pull request if changes are needed. You can also manually trigger this workflow from the Actions tab in the GitHub repository.
 
 ### Testing
 

@@ -1,10 +1,9 @@
-version: '3.8'
-
 services:
   app:
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: ./Dockerfile
+      target: development
     container_name: nextjs-image-processor-dev
     restart: unless-stopped
     ports:
@@ -21,10 +20,8 @@ services:
       - NEXT_PUBLIC_SITE_BACKGROUND_COLOR=#ffffff
       - CLEANUP_API_KEY=dev-api-key
     volumes:
-      - ../app:/app/app
-      - ../public:/app/public
-      - ../node_modules:/app/node_modules
-      - ../custom-icons:/app/public/custom-icons
+      - ..:/app
+      - /app/node_modules
       - ../public/uploads:/app/public/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/api/healthcheck || exit 1"]
@@ -36,7 +33,7 @@ services:
   cleanup-cron:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.cleanup
+      dockerfile: ./Dockerfile.cleanup
     container_name: nextjs-image-cleanup-dev
     restart: unless-stopped
     depends_on:
