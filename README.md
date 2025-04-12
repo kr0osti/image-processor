@@ -100,11 +100,27 @@ pnpm test:coverage
 pnpm test:e2e
 ```
 
-### Running tests locally
+### Running tests in Docker
+
+For running tests in the Docker environment, use the provided script:
 
 ```bash
-docker exec -it nextjs-image-processor-dev sh -c "cd /app && NODE_ENV=test-node npx jest __tests__/api/images.test.js --testEnvironment=node --detectOpenHandles --forceExit"
+# Run all API tests
+./docker-test.sh
+
+# Run specific test file
+./docker-test.sh __tests__/api/images.test.js
+
+# Run tests for a specific directory
+./docker-test.sh __tests__/api/
 ```
+
+The script handles:
+- Setting up the proper test environment
+- Configuring mocks for dependencies
+- Copying test files to the container
+- Running tests with the correct parameters
+- Cleaning up temporary files
 
 ## 📦 Dependency Management
 
