@@ -212,10 +212,6 @@ export default function ImageProcessor() {
     }
   }
 
-  // Remove the handleDirectImageSubmit function
-  const handleDirectImageSubmit = (e: React.FormEvent) => {
-    // This entire function can be removed
-  }
 
   const processHtmlImageTag = (imgElement: HTMLImageElement, width: number, height: number) => {
     addLog("Creating placeholder image from HTML tag dimensions")

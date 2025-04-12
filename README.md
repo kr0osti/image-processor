@@ -1,47 +1,20 @@
 # NextJS Image Processor
 
-A powerful web application that allows you to download, process, and standardize images from various sources.
+A powerful web application that allows you to download, process, and standardize images from various sources. This tool helps you create consistent 1500x1500px images with proper positioning based on the image content.
 
-![NextJS Image Processor](https://via.placeholder.com/1200x630/0a0a0a/FFFFFF?text=NextJS+Image+Processor)
+## 📋 Features
 
-## 🌟 Features
-
-- **Multiple Image Sources**: Upload local files, process direct image URLs, or scrape images from webpages
-- **Standardized Processing**: Automatically resize and position images to 1500x1500px
-- **Batch Processing**: Process multiple images at once
+- **Multiple Image Sources**: Upload local files or scrape images from webpages
+- **Intelligent Processing**: Automatically resize and position images to 1500x1500px based on content
+- **Batch Processing**: Process multiple images at once with filtering by size
 - **Download Options**: Download individual images or as a ZIP archive
 - **CORS Handling**: Creates placeholders for images that can't be loaded due to CORS restrictions
-- **Detailed Logging**: Real-time logs of all processing steps
 - **Automatic Cleanup**: Uploaded files are automatically deleted after 1 hour
 - **Rate Limiting**: All API endpoints are protected with rate limiting to prevent abuse
 
-## 🔍 How It Works
+## 🚀 Quick Start
 
-The application uses a combination of client-side and server-side technologies:
-
-1. **Image Acquisition**:
-   - Direct uploads using the browser's File API
-   - URL fetching with server-side actions
-   - Web scraping using Cheerio for HTML parsing
-
-2. **Image Processing**:
-   - Canvas API for image manipulation
-   - Automatic positioning based on image dimensions
-   - Placeholder generation for failed images
-
-3. **Output Generation**:
-   - Direct downloads as PNG files
-   - ZIP archive creation using JSZip
-
-## 🚀 Getting Started
-
-### Running with Docker
-
-The application can be run in two modes: production (default) or development.
-
-#### Production Mode
-
-Use this mode for regular usage with pre-built images from GitHub Container Registry:
+### Using Docker (Recommended)
 
 ```bash
 # Clone the repository
@@ -50,44 +23,34 @@ cd nextjs-image-processor
 
 # Create a .env file from the example
 cp .env.example .env
-
-# Set up proper permissions for the uploads directory
-chmod +x setup-permissions.sh
-./setup-permissions.sh
 
 # Start the application with Docker Compose
 docker compose up -d
 ```
 
-#### Development Mode
+The application will be available at http://localhost:6060
 
-Use this mode during development when you want to build the Docker images locally:
+### Local Development
 
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/nextjs-image-processor.git
 cd nextjs-image-processor
 
-# Create a .env file from the example
-cp .env.example .env
+# Install dependencies
+pnpm install
 
-# Set up proper permissions for the uploads directory
-chmod +x setup-permissions.sh
-./setup-permissions.sh
-
-# Start the application with Docker Compose using the development configuration
-cd docker && docker compose -f docker-compose-dev.yml up -d
+# Start the development server
+pnpm dev
 ```
 
-The application will be available at http://localhost:6060
+The application will be available at http://localhost:3000
 
-> **Important**: If you encounter permission errors when uploading images, make sure the `public/uploads` directory has write permissions for the Docker container. You can fix this by running the `setup-permissions.sh` script.
+## 🔧 Configuration
 
-### 🎨 Customizing Your Installation
+### Environment Variables
 
-#### Environment Variables
-
-You can customize the application by setting these environment variables in your `.env` file:
+Customize the application by setting these environment variables in your `.env` file:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -98,227 +61,88 @@ You can customize the application by setting these environment variables in your
 | `NEXT_PUBLIC_SITE_THEME_COLOR` | Theme color (hex) | #000000 |
 | `NEXT_PUBLIC_SITE_BACKGROUND_COLOR` | Background color (hex) | #ffffff |
 | `CLEANUP_API_KEY` | API key for the cleanup endpoint | change-this-to-a-secure-key |
+| `NEXT_PUBLIC_DEBUG` | Enable debug logging | false |
 
-#### Custom Icons and Branding
+## 🏗️ Architecture
 
-You can customize the application's icons and branding by:
+### Components
 
-1. Creating a `custom-icons` directory on your host machine
-2. Adding the following files to that directory:
-   - `favicon.ico` - The website favicon
-   - `icon-16x16.png` - Small icon (16x16 pixels)
-   - `icon-32x32.png` - Medium icon (32x32 pixels)
-   - `icon-192x192.png` - Large icon for PWA (192x192 pixels)
-   - `icon-512x512.png` - Extra large icon for PWA (512x512 pixels)
-   - `icon-maskable-192x192.png` - Maskable icon for Android (192x192 pixels)
-   - `icon-maskable-512x512.png` - Maskable icon for Android (512x512 pixels)
-   - `apple-icon.png` - Icon for Apple devices (180x180 pixels)
-   - `safari-pinned-tab.svg` - SVG icon for Safari pinned tabs
+The application consists of two main components:
 
-3. The Docker Compose configuration automatically mounts this directory to make your custom icons available to the application.
+1. **Main Application**: A Next.js application that handles image processing
+2. **Cleanup Service**: A service that runs every minute to delete uploaded files older than 1 hour
 
-### 🔧 System Architecture
+### API Endpoints
 
-The application consists of two Docker containers:
+| Endpoint | Method | Description | Rate Limit |
+|----------|--------|-------------|------------|
+| `/api/images` | POST | Upload and process images | 300 req/min |
+| `/api/proxy` | GET | Proxy for fetching images to avoid CORS issues | 500 req/min |
+| `/api/serve-image` | GET | Serve processed images from the server | 120 req/min |
+| `/api/cleanup` | GET | Trigger cleanup of old uploads (requires API key) | 5 req/min |
+| `/api/healthcheck` | GET | Check if the application is running | 30 req/min |
 
-1. **Main Application (app)**: The NextJS application that handles image processing
-2. **Cleanup Service (cleanup-cron)**: A dedicated service that runs every minute to delete uploaded files older than 1 hour
-
-#### Docker Compose Configurations
-
-The project includes two Docker Compose configurations:
-
-1. **docker/docker-compose.yaml**: The default configuration that uses pre-built images from GitHub Container Registry
-2. **docker/docker-compose-dev.yml**: Development configuration that builds images locally
-
-### 🛠️ Troubleshooting
-
-#### Permission Issues
-
-If you encounter permission errors when uploading images:
-
-```bash
-# Run the setup-permissions script
-./setup-permissions.sh
-```
-
-#### Docker Issues
-
-If you encounter issues with Docker:
-
-1. Ensure your Docker and Docker Compose are up to date
-2. Check that port 6060 is available on your system
-3. Verify that the environment variables in your `.env` file are correctly formatted
-4. Make sure you have internet access to pull the Docker images from GitHub Container Registry
-
-
-#### Healthcheck Failures
-
-The application includes a healthcheck that runs every 30 seconds. If the healthcheck fails:
-
-1. Check the container logs: `docker logs nextjs-image-processor`
-2. Verify that the application is running: `curl http://localhost:6060/api/healthcheck`
-3. Restart the container: `docker compose restart app`
-
-#### Rate Limiting
-
-All API endpoints are protected with rate limiting to prevent abuse. The default limits are:
-
-- Global API limit: 1000 requests per minute across all API endpoints
-- Proxy endpoint: 500 requests per minute
-- Serve-image endpoint: 120 requests per minute
-- Images endpoint: 300 requests per minute
-- Cleanup endpoint: 5 requests per minute
-- Healthcheck endpoint: 30 requests per minute
-
-If you encounter rate limit errors (HTTP 429), wait a minute before trying again.
-
-## 🛠️ Development
-
-### Prerequisites
-
-- Node.js 22.x or later
-- pnpm package manager
-
-### Setup Development Environment
-
-```bash
-# Install dependencies
-pnpm install
-
-# Start the development server
-pnpm dev
-```
-
-### Dependency Management
-
-This project uses pnpm for dependency management. The `pnpm-lock.yaml` file is required for Dependabot to properly identify and update vulnerable dependencies.
-
-If you need to regenerate the lockfile:
-
-```bash
-# Use the provided script (recommended)
-pnpm update-lockfile
-
-# Or manually with Docker
-docker build -t lockfile-generator -f docker/Dockerfile . --target=base
-docker create --name lockfile-temp lockfile-generator
-docker cp lockfile-temp:/tmp/pnpm-lock.yaml ./pnpm-lock.yaml
-docker rm lockfile-temp
-```
-
-This approach ensures that the lockfile is generated in a consistent environment with the correct pnpm version (8.15.1), making it compatible with Dependabot.
-
-Always commit the updated `pnpm-lock.yaml` file when adding or updating dependencies.
-
-#### Automatic Lockfile Updates
-
-A GitHub workflow runs weekly to automatically update the lockfile and create a pull request if changes are needed. You can also manually trigger this workflow from the Actions tab in the GitHub repository.
-
-### Testing
+## 🧪 Testing
 
 This project includes comprehensive test coverage with Jest for unit/integration tests and Playwright for end-to-end tests.
-
-#### Running Unit and Integration Tests
 
 ```bash
 # Run all Jest tests
 pnpm test
 
-# Run tests in watch mode during development
+# Run tests in watch mode
 pnpm test:watch
 
 # Generate test coverage report
 pnpm test:coverage
-```
 
-#### Running End-to-End Tests
-
-```bash
-# Install Playwright browsers (first time only)
-pnpm exec playwright install --with-deps
-
-# Run all E2E tests
+# Run end-to-end tests
 pnpm test:e2e
-
-# Run E2E tests in a specific browser
-pnpm exec playwright test --project=chromium
 ```
 
-#### GitHub Actions Integration
+## 📦 Dependency Management
 
-Tests automatically run in GitHub Actions on push and pull requests. The workflow:
-
-1. Runs unit and integration tests with Jest
-2. Generates and uploads test coverage reports
-3. Runs end-to-end tests with Playwright
-4. Uploads Playwright test reports
-
-### Project Structure
-
-- `/app`: Next.js App Router components and pages
-- `/components`: Reusable UI components
-- `/lib`: Utility functions and shared code
-- `/public`: Static assets
-
-### Building for Production
+This project uses pnpm for dependency management. To update dependencies:
 
 ```bash
-# Build the application
-pnpm build
-
-# Start the production server
-pnpm start
+# Update dependencies and regenerate lockfile
+pnpm update-lockfile
 ```
 
-## 🔄 CI/CD Pipeline
+## 🔄 Docker Development
 
-### Versioning
+For development with Docker:
 
-This project uses semantic versioning. Docker images are tagged with version numbers (e.g., `0.1.0`) as well as `latest`.
+```bash
+# Start the development environment
+cd docker && docker-compose -f docker-compose-dev.yml up -d
 
-You can specify which version to use by setting the `VERSION` environment variable in your `.env` file:
-
-```
-# Use a specific version
-VERSION=0.1.0
-
-# Or leave it empty to use the latest version
-VERSION=
+# Stop the development environment
+cd docker && docker-compose -f docker-compose-dev.yml down
 ```
 
-If `VERSION` is not set, the `latest` tag will be used by default.
+## 🛠️ Troubleshooting
 
-This project uses GitHub Actions for continuous integration and deployment:
+### Permission Issues
 
-### CI Workflows
+If you encounter permission errors when uploading images, ensure the `public/uploads` directory has proper permissions:
 
-- **CI**: Builds and tests the application on every push and pull request
-- **Test**: Runs linting and tests on every push and pull request
-- **Security Scan**: Performs security scanning using Snyk and CodeQL
-- **Accessibility Testing**: Ensures the application meets WCAG accessibility standards
+```bash
+mkdir -p public/uploads
+chmod -R 777 public/uploads
+```
 
-### CD Workflows
+### Rate Limiting
 
-- **Docker Build**: Builds and pushes Docker images to GitHub Container Registry on main branch pushes and tags
-  - Images are tagged with branch name, commit SHA, and semantic version (for tags)
-  - These images are used by the default `docker-compose.yaml` configuration
-- **Deploy to Staging**: Automatically deploys to the staging environment on pushes to the develop branch
-- **Deploy to Production**: Deploys to production when a new release is published
+If you encounter HTTP 429 errors, you've exceeded the rate limit for an API endpoint. Wait a minute before trying again.
 
-### Automated Maintenance
+### Healthcheck Failures
 
-- **Dependabot**: Automatically creates PRs for dependency updates (npm, GitHub Actions, Docker)
+If Docker healthchecks fail:
 
-## 🤝 Contributing
-
-Contributions are welcome! Here's how you can help:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add some amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+1. Check container logs: `docker logs nextjs-image-processor`
+2. Verify the application is running: `curl http://localhost:6060/api/healthcheck`
+3. Restart the container: `docker compose restart app`
 
 ## 📝 License
 
@@ -331,5 +155,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Tailwind CSS](https://tailwindcss.com/)
 - [JSZip](https://stuk.github.io/jszip/)
 - [Cheerio](https://cheerio.js.org/)
-
-
