@@ -62,24 +62,44 @@ global.Headers = class Headers {
   }
 };
 
-// Mock NextRequest
+// Mock NextRequest and NextResponse
 jest.mock('next/server', () => {
+  class MockNextResponse {
+    constructor(body, init = {}) {
+      this.body = body;
+      this.status = init.status || 200;
+      this.headers = new Map(Object.entries(init.headers || {}));
+    }
+
+    json() {
+      return Promise.resolve(this.body);
+    }
+
+    arrayBuffer() {
+      return Promise.resolve(this.body);
+    }
+
+    get(name) {
+      return this.headers.get(name);
+    }
+  }
+
+  const NextResponseMock = jest.fn().mockImplementation((body, init) => {
+    return new MockNextResponse(body, init);
+  });
+
+  NextResponseMock.json = jest.fn((data, options) => {
+    return new MockNextResponse(data, options);
+  });
+
+  NextResponseMock.redirect = jest.fn((url) => {
+    const response = new MockNextResponse(null, { status: 302 });
+    response.headers.set('Location', url);
+    return response;
+  });
+
   return {
-    NextResponse: {
-      json: jest.fn((data, options) => {
-        return {
-          status: options?.status || 200,
-          headers: new Map(Object.entries(options?.headers || {})),
-          json: async () => data,
-        };
-      }),
-      redirect: jest.fn((url) => {
-        return {
-          status: 302,
-          headers: new Map([['Location', url]]),
-        };
-      }),
-    },
+    NextResponse: NextResponseMock,
     NextRequest: class NextRequest extends global.Request {
       constructor(url, options = {}) {
         super(url, options);
