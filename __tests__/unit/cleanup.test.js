@@ -1,28 +1,32 @@
 import { cleanupOldUploads } from '../../app/utils/cleanup';
-import path from 'path';
 
 // Mock the fs/promises module
-const mockReaddir = jest.fn();
-const mockStat = jest.fn();
-const mockUnlink = jest.fn();
-
-jest.mock('fs/promises', () => ({
-  readdir: mockReaddir,
-  stat: mockStat,
-  unlink: mockUnlink
-}));
+jest.mock('fs/promises', () => {
+  return {
+    readdir: jest.fn(),
+    stat: jest.fn(),
+    unlink: jest.fn().mockResolvedValue(undefined)
+  };
+});
 
 // Mock the fs module
-const mockExistsSync = jest.fn();
-jest.mock('fs', () => ({
-  existsSync: mockExistsSync
-}));
+jest.mock('fs', () => {
+  return {
+    existsSync: jest.fn()
+  };
+});
 
 // Mock the path module
-const mockJoin = jest.fn();
-jest.mock('path', () => ({
-  join: mockJoin
-}));
+jest.mock('path', () => {
+  return {
+    join: jest.fn()
+  };
+});
+
+// Import mocks after they've been defined
+import * as fsPromises from 'fs/promises';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Mock console to avoid cluttering test output
 global.console.log = jest.fn();
@@ -37,20 +41,20 @@ describe('Cleanup Utility', () => {
     jest.spyOn(process, 'cwd').mockReturnValue('/test/path');
     
     // Mock path.join to return a predictable path
-    mockJoin.mockImplementation((...args) => args.join('/'));
+    path.join.mockImplementation((...args) => args.join('/'));
     
     // Mock fs.existsSync to return true by default
-    mockExistsSync.mockReturnValue(true);
+    fs.existsSync.mockReturnValue(true);
   });
 
   it('should return early if uploads directory does not exist', async () => {
     // Mock fs.existsSync to return false for this test
-    mockExistsSync.mockReturnValue(false);
+    fs.existsSync.mockReturnValue(false);
 
     const result = await cleanupOldUploads();
 
     expect(result).toEqual({ deleted: 0, errors: 0 });
-    expect(mockReaddir).not.toHaveBeenCalled();
+    expect(fsPromises.readdir).not.toHaveBeenCalled();
   });
 
   it('should delete files older than the specified age', async () => {
@@ -59,11 +63,11 @@ describe('Cleanup Utility', () => {
     jest.spyOn(Date, 'now').mockReturnValue(now);
 
     // Mock readdir to return a list of files
-    mockReaddir.mockResolvedValue(['file1.jpg', 'file2.png', '.gitkeep']);
+    fsPromises.readdir.mockResolvedValue(['file1.jpg', 'file2.png', '.gitkeep']);
 
     // Mock stat to return file stats
     // file1.jpg is older than maxAge, file2.png is newer
-    mockStat.mockImplementation((filePath) => {
+    fsPromises.stat.mockImplementation((filePath) => {
       if (filePath.includes('file1')) {
         return Promise.resolve({
           mtimeMs: now - 2 * 60 * 60 * 1000, // 2 hours old
@@ -76,24 +80,21 @@ describe('Cleanup Utility', () => {
       return Promise.reject(new Error('Unexpected file path'));
     });
 
-    // Mock unlink to resolve successfully
-    mockUnlink.mockResolvedValue(undefined);
-
     // Run the cleanup with a maxAge of 1 hour
     const result = await cleanupOldUploads(60 * 60 * 1000);
 
     // Verify that only file1.jpg was deleted
-    expect(mockUnlink).toHaveBeenCalledTimes(1);
-    expect(mockUnlink).toHaveBeenCalledWith('/test/path/public/uploads/file1.jpg');
+    expect(fsPromises.unlink).toHaveBeenCalledTimes(1);
+    expect(fsPromises.unlink).toHaveBeenCalledWith('/test/path/public/uploads/file1.jpg');
     expect(result).toEqual({ deleted: 1, errors: 0 });
   });
 
   it('should handle errors when processing files', async () => {
     // Mock readdir to return a list of files
-    mockReaddir.mockResolvedValue(['file1.jpg', 'file2.png']);
+    fsPromises.readdir.mockResolvedValue(['file1.jpg', 'file2.png']);
 
     // Mock stat to throw an error for file1.jpg
-    mockStat.mockImplementation((filePath) => {
+    fsPromises.stat.mockImplementation((filePath) => {
       if (filePath.includes('file1')) {
         return Promise.reject(new Error('Test error'));
       } else {
@@ -103,29 +104,26 @@ describe('Cleanup Utility', () => {
       }
     });
 
-    // Mock unlink to resolve successfully
-    mockUnlink.mockResolvedValue(undefined);
-
     // Run the cleanup
     const result = await cleanupOldUploads();
 
     // Verify that file2.png was deleted and an error was recorded for file1.jpg
-    expect(mockUnlink).toHaveBeenCalledTimes(1);
-    expect(mockUnlink).toHaveBeenCalledWith('/test/path/public/uploads/file2.png');
+    expect(fsPromises.unlink).toHaveBeenCalledTimes(1);
+    expect(fsPromises.unlink).toHaveBeenCalledWith('/test/path/public/uploads/file2.png');
     expect(result).toEqual({ deleted: 1, errors: 1 });
   });
 
   it('should handle errors when deleting files', async () => {
     // Mock readdir to return a list of files
-    mockReaddir.mockResolvedValue(['file1.jpg']);
+    fsPromises.readdir.mockResolvedValue(['file1.jpg']);
 
     // Mock stat to return old file stats
-    mockStat.mockResolvedValue({
+    fsPromises.stat.mockResolvedValue({
       mtimeMs: Date.now() - 2 * 60 * 60 * 1000, // 2 hours old
     });
 
     // Mock unlink to throw an error
-    mockUnlink.mockRejectedValueOnce(new Error('Unlink error'));
+    fsPromises.unlink.mockRejectedValueOnce(new Error('Unlink error'));
 
     // Run the cleanup
     const result = await cleanupOldUploads();
@@ -136,24 +134,21 @@ describe('Cleanup Utility', () => {
 
   it('should skip .gitkeep file', async () => {
     // Mock readdir to return a list of files including .gitkeep
-    mockReaddir.mockResolvedValue(['file1.jpg', '.gitkeep']);
+    fsPromises.readdir.mockResolvedValue(['file1.jpg', '.gitkeep']);
 
     // Mock stat to return old file stats
-    mockStat.mockResolvedValue({
+    fsPromises.stat.mockResolvedValue({
       mtimeMs: Date.now() - 2 * 60 * 60 * 1000, // 2 hours old
     });
-
-    // Mock unlink to resolve successfully
-    mockUnlink.mockResolvedValue(undefined);
 
     // Run the cleanup
     await cleanupOldUploads();
 
     // Verify that only file1.jpg was processed
-    expect(mockStat).toHaveBeenCalledTimes(1);
-    expect(mockStat).toHaveBeenCalledWith('/test/path/public/uploads/file1.jpg');
+    expect(fsPromises.stat).toHaveBeenCalledTimes(1);
+    expect(fsPromises.stat).toHaveBeenCalledWith('/test/path/public/uploads/file1.jpg');
     // Verify that .gitkeep was not processed
-    const statCalls = mockStat.mock.calls.map(call => call[0]);
+    const statCalls = fsPromises.stat.mock.calls.map(call => call[0]);
     expect(statCalls).not.toContain('/test/path/public/uploads/.gitkeep');
   });
 });

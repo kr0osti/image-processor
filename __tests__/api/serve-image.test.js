@@ -1,55 +1,69 @@
 import { GET } from '../../app/api/serve-image/route';
-import path from 'path';
 
 // Mock the fs/promises module
-const mockReadFile = jest.fn();
-jest.mock('fs/promises', () => ({
-  readFile: mockReadFile
-}));
+jest.mock('fs/promises', () => {
+  return {
+    readFile: jest.fn().mockResolvedValue(Buffer.from('test image data'))
+  };
+});
 
 // Mock the fs module
-const mockExistsSync = jest.fn();
-jest.mock('fs', () => ({
-  existsSync: mockExistsSync
-}));
+jest.mock('fs', () => {
+  return {
+    existsSync: jest.fn().mockReturnValue(true)
+  };
+});
 
 // Mock the path module
-const mockJoin = jest.fn();
-const mockExtname = jest.fn();
-jest.mock('path', () => ({
-  join: mockJoin,
-  extname: mockExtname
-}));
+jest.mock('path', () => {
+  return {
+    join: jest.fn(),
+    extname: jest.fn()
+  };
+});
 
 // Mock NextResponse
-class MockResponse {
-  constructor(body, init = {}) {
-    this.body = body;
-    this.status = init.status || 200;
-    this.headers = new Map();
+jest.mock('next/server', () => {
+  class MockResponse {
+    constructor(body, init = {}) {
+      this.body = body;
+      this.status = init.status || 200;
+      this.headers = new Map();
+      
+      // Add headers from init
+      if (init.headers) {
+        Object.entries(init.headers).forEach(([key, value]) => {
+          this.headers.set(key, value);
+        });
+      }
+    }
     
-    // Add headers from init
-    if (init.headers) {
-      Object.entries(init.headers).forEach(([key, value]) => {
-        this.headers.set(key, value);
-      });
+    json() {
+      return Promise.resolve(this.body);
+    }
+    
+    get(name) {
+      return this.headers.get(name);
     }
   }
   
-  json() {
-    return Promise.resolve(this.body);
-  }
-}
+  return {
+    NextResponse: {
+      json: jest.fn((data, options) => {
+        return new MockResponse(data, options);
+      })
+    },
+    NextResponse: jest.fn().mockImplementation((body, init) => {
+      return new MockResponse(body, init);
+    })
+  };
+});
 
-const mockNextResponseJson = jest.fn();
-const mockNextResponse = jest.fn();
-
-jest.mock('next/server', () => ({
-  NextResponse: {
-    json: mockNextResponseJson
-  },
-  NextResponse: mockNextResponse
-}));
+// Import mocks after they've been defined
+import * as fsPromises from 'fs/promises';
+import * as fs from 'fs';
+import * as path from 'path';
+import { NextResponse } from 'next/server';
 
 // Mock console to avoid cluttering test output
 global.console.error = jest.fn();
@@ -63,22 +77,12 @@ describe('Serve Image API', () => {
     jest.spyOn(process, 'cwd').mockReturnValue('/test/path');
 
     // Mock path.join to return a predictable path
-    mockJoin.mockImplementation((...args) => args.join('/'));
+    path.join.mockImplementation((...args) => args.join('/'));
 
     // Mock path.extname to return file extensions
-    mockExtname.mockImplementation((filename) => {
+    path.extname.mockImplementation((filename) => {
       const parts = filename.split('.');
       return parts.length > 1 ? `.${parts.pop()}` : '';
-    });
-
-    // Mock NextResponse.json to return a mock response
-    mockNextResponseJson.mockImplementation((data, options) => {
-      return new MockResponse(data, options);
-    });
-
-    // Mock NextResponse constructor to return a mock response
-    mockNextResponse.mockImplementation((body, init) => {
-      return new MockResponse(body, init);
     });
   });
 
@@ -101,7 +105,7 @@ describe('Serve Image API', () => {
 
   it('should return 404 if the file does not exist', async () => {
     // Mock existsSync to return false
-    mockExistsSync.mockReturnValue(false);
+    fs.existsSync.mockReturnValue(false);
 
     // Create a mock request with a filename
     const request = { url: 'http://localhost:3000/api/serve-image?file=test.jpg' };
@@ -121,11 +125,7 @@ describe('Serve Image API', () => {
 
   it('should serve a PNG image with the correct content type', async () => {
     // Mock existsSync to return true
-    mockExistsSync.mockReturnValue(true);
-
-    // Mock readFile to return a buffer
-    const imageBuffer = Buffer.from('test image data');
-    mockReadFile.mockResolvedValue(imageBuffer);
+    fs.existsSync.mockReturnValue(true);
 
     // Create a mock request with a PNG filename
     const request = { url: 'http://localhost:3000/api/serve-image?file=test.png' };
@@ -138,16 +138,12 @@ describe('Serve Image API', () => {
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=86400');
 
     // Verify that readFile was called with the correct path
-    expect(mockReadFile).toHaveBeenCalledWith('/test/path/public/uploads/test.png');
+    expect(fsPromises.readFile).toHaveBeenCalledWith('/test/path/public/uploads/test.png');
   });
 
   it('should serve a JPEG image with the correct content type', async () => {
     // Mock existsSync to return true
-    mockExistsSync.mockReturnValue(true);
-
-    // Mock readFile to return a buffer
-    const imageBuffer = Buffer.from('test image data');
-    mockReadFile.mockResolvedValue(imageBuffer);
+    fs.existsSync.mockReturnValue(true);
 
     // Create a mock request with a JPEG filename
     const request = { url: 'http://localhost:3000/api/serve-image?file=test.jpg' };
@@ -159,15 +155,15 @@ describe('Serve Image API', () => {
     expect(response.headers.get('Content-Type')).toBe('image/jpeg');
 
     // Verify that readFile was called with the correct path
-    expect(mockReadFile).toHaveBeenCalledWith('/test/path/public/uploads/test.jpg');
+    expect(fsPromises.readFile).toHaveBeenCalledWith('/test/path/public/uploads/test.jpg');
   });
 
   it('should handle errors when reading the file', async () => {
     // Mock existsSync to return true
-    mockExistsSync.mockReturnValue(true);
+    fs.existsSync.mockReturnValue(true);
 
     // Mock readFile to throw an error
-    mockReadFile.mockRejectedValue(new Error('Test error'));
+    fsPromises.readFile.mockRejectedValueOnce(new Error('Test error'));
 
     // Create a mock request with a filename
     const request = { url: 'http://localhost:3000/api/serve-image?file=test.jpg' };
