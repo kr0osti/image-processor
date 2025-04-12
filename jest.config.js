@@ -11,6 +11,7 @@ const customJestConfig = {
     process.env.NODE_ENV === 'test-node' ? '<rootDir>/jest.node.setup.js' : '<rootDir>/jest.setup.js',
   ],
   testEnvironment: 'jest-environment-jsdom',
+  forceExit: true,
   testMatch: [
     '**/__tests__/**/*.test.(js|jsx|ts|tsx)',
     '**/?(*.)+(spec|test).(js|jsx|ts|tsx)',
