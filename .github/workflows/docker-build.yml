@@ -60,6 +60,10 @@ jobs:
             echo "SHOULD_BUILD=false" >> $GITHUB_ENV
           fi
 
+          # Debug output
+          echo "Changed files: ${{ steps.changed-files.outputs.src_all_changed_files }}"
+          echo "Any changed: ${{ steps.changed-files.outputs.src_any_changed }}"
+
       - name: Read version
         id: version
         run: echo "VERSION=$(cat version.txt)" >> $GITHUB_OUTPUT
