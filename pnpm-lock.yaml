@@ -64,3 +64,34 @@ devDependencies:
   'supertest': 6.3.4
   'tailwindcss': 3.4.17
   'typescript': 5.4.5
+
+packages:
+
+  /jest@29.7.0:
+    resolution: {integrity: sha512-c5FcJvvNBQwWBL+aCG9qFa5UbvmhtPmeCZUqKvlUDRwUdmXpUldNUHB5LeBUWvSZXvFsq5J0VOvhUOJ1Mj8xA==}
+    engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
+    dependencies:
+      '@jest/core': 29.7.0
+      '@jest/types': 29.6.3
+      import-local: 3.1.0
+      jest-cli: 29.7.0
+    transitivePeerDependencies:
+      - supports-color
+      - ts-node
+    dev: true
+
+  /jest-environment-jsdom@29.7.0:
+    resolution: {integrity: sha512-N5G3nIg+xNqr7Xj8RfCsQsI5mJlZRh7AELcDJiDrEXHuPb8zXnH/aQoK/CZfKVEBy3Wk7sKLR8/hJJeAFqrOTg==}
+    engines: {node: ^14.15.0 || ^16.10.0 || >=18.0.0}
+    dependencies:
+      '@jest/environment': 29.7.0
+      '@jest/fake-timers': 29.7.0
+      '@jest/types': 29.6.3
+      '@types/jsdom': 21.1.6
+      '@types/node': 22.0.0
+      jest-mock: 29.7.0
+      jest-util: 29.7.0
+      jsdom: 22.1.0
+    transitivePeerDependencies:
+      - supports-color
+    dev: true

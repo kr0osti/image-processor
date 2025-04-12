@@ -47,6 +47,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Verify Jest installation
+        run: |
+          echo "Checking Jest installation..."
+          ls -la node_modules/.bin/
+          if [ -f node_modules/.bin/jest ]; then
+            echo "Jest binary found at node_modules/.bin/jest"
+          else
+            echo "Jest binary not found, installing explicitly..."
+            pnpm add -D jest @testing-library/jest-dom @testing-library/react jest-environment-jsdom
+          fi
+
       - name: Create uploads directory
         run: |
           mkdir -p public/uploads
