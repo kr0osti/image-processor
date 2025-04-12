@@ -41,6 +41,15 @@ RUN apk add --no-cache curl
 RUN npm install -g pnpm@8.15.1
 ENV PATH="/usr/local/bin:$PATH"
 
+# Copy package.json and pnpm-lock.yaml
+COPY package.json pnpm-lock.yaml* ./
+
+# Install dependencies
+RUN pnpm install
+
+# Copy the rest of the application
+COPY . .
+
 # Create uploads directory with proper permissions
 RUN mkdir -p /app/public/uploads && chmod -R 777 /app/public/uploads
 

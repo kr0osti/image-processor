@@ -20,7 +20,15 @@ services:
       - NEXT_PUBLIC_SITE_BACKGROUND_COLOR=#ffffff
       - CLEANUP_API_KEY=dev-api-key
     volumes:
-      - ..:/app
+      - ../app:/app/app
+      - ../components:/app/components
+      - ../lib:/app/lib
+      - ../public:/app/public
+      - ../styles:/app/styles
+      - ../next.config.js:/app/next.config.js
+      - ../tsconfig.json:/app/tsconfig.json
+      - ../package.json:/app/package.json
+      - ../pnpm-lock.yaml:/app/pnpm-lock.yaml
       - /app/node_modules
       - ../public/uploads:/app/public/uploads
     healthcheck:
