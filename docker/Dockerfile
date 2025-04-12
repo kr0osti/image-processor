@@ -7,7 +7,7 @@ WORKDIR /app
 # Install dependencies using pnpm
 COPY package.json pnpm-lock.yaml* ./
 RUN apk add --no-cache curl
-RUN npm install -g pnpm@8.15.1
+RUN npm install -g pnpm@^8.15.1
 # Make sure pnpm is in the PATH
 ENV PATH="/usr/local/bin:$PATH"
 RUN pnpm install --no-frozen-lockfile
@@ -22,7 +22,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Install pnpm in the builder stage
-RUN npm install -g pnpm@8.15.1
+RUN npm install -g pnpm@^8.15.1
 ENV PATH="/usr/local/bin:$PATH"
 
 # Next.js collects completely anonymous telemetry data about general usage.
@@ -38,7 +38,7 @@ WORKDIR /app
 
 # Install dependencies
 RUN apk add --no-cache curl
-RUN npm install -g pnpm@8.15.1
+RUN npm install -g pnpm@^8.15.1
 ENV PATH="/usr/local/bin:$PATH"
 
 # Copy package.json and pnpm-lock.yaml

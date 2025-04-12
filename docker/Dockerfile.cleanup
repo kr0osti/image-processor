@@ -12,7 +12,7 @@ COPY app/api/cleanup/route.js ./app/api/cleanup/
 COPY docker/cleanup.sh ./
 
 # Install dependencies
-RUN npm install -g pnpm@8.15.1 && \
+RUN npm install -g pnpm@^8.15.1 && \
     pnpm install --prod && \
     chmod +x /app/cleanup.sh
 
