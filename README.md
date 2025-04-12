@@ -190,6 +190,61 @@ pnpm install
 pnpm dev
 ```
 
+### Dependency Management
+
+This project uses pnpm for dependency management. The `pnpm-lock.yaml` file is required for Dependabot to properly identify and update vulnerable dependencies.
+
+If you need to regenerate the lockfile:
+
+```bash
+# Run the generate-lockfile script
+./generate-lockfile.sh
+
+# Or manually with pnpm
+pnpm install --lockfile-only
+```
+
+Always commit the updated `pnpm-lock.yaml` file when adding or updating dependencies.
+
+### Testing
+
+This project includes comprehensive test coverage with Jest for unit/integration tests and Playwright for end-to-end tests.
+
+#### Running Unit and Integration Tests
+
+```bash
+# Run all Jest tests
+pnpm test
+
+# Run tests in watch mode during development
+pnpm test:watch
+
+# Generate test coverage report
+pnpm test:coverage
+```
+
+#### Running End-to-End Tests
+
+```bash
+# Install Playwright browsers (first time only)
+pnpm exec playwright install --with-deps
+
+# Run all E2E tests
+pnpm test:e2e
+
+# Run E2E tests in a specific browser
+pnpm exec playwright test --project=chromium
+```
+
+#### GitHub Actions Integration
+
+Tests automatically run in GitHub Actions on push and pull requests. The workflow:
+
+1. Runs unit and integration tests with Jest
+2. Generates and uploads test coverage reports
+3. Runs end-to-end tests with Playwright
+4. Uploads Playwright test reports
+
 ### Project Structure
 
 - `/app`: Next.js App Router components and pages
