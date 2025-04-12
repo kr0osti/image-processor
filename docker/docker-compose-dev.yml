@@ -2,7 +2,7 @@ services:
   app:
     build:
       context: ..
-      dockerfile: ./Dockerfile
+      dockerfile: docker/Dockerfile
       target: development
     container_name: nextjs-image-processor-dev
     restart: unless-stopped
@@ -33,7 +33,7 @@ services:
   cleanup-cron:
     build:
       context: ..
-      dockerfile: ./Dockerfile.cleanup
+      dockerfile: docker/Dockerfile.cleanup
     container_name: nextjs-image-cleanup-dev
     restart: unless-stopped
     depends_on:
