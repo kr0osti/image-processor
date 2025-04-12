@@ -1,50 +1,52 @@
 import { cleanupOldUploads } from '../../app/utils/cleanup';
 import * as fsPromises from 'fs/promises';
-import { existsSync } from 'fs';
+import * as fs from 'fs';
 import path from 'path';
 
-// Mock fs modules
+// Mock fs/promises module
 jest.mock('fs/promises', () => ({
   readdir: jest.fn(),
   stat: jest.fn(),
   unlink: jest.fn().mockResolvedValue(undefined),
 }));
 
+// Mock fs module
 jest.mock('fs', () => ({
   existsSync: jest.fn(),
 }));
 
+// Mock path module
 jest.mock('path', () => ({
   join: jest.fn(),
 }));
 
-// Mock console.log and console.error to avoid cluttering test output
+// Mock console to avoid cluttering test output
 global.console.log = jest.fn();
 global.console.error = jest.fn();
 
 describe('Cleanup Utility', () => {
   beforeEach(() => {
-    // Reset mocks before each test
+    // Reset all mocks before each test
     jest.clearAllMocks();
-
+    
     // Mock process.cwd() to return a fixed path
     jest.spyOn(process, 'cwd').mockReturnValue('/test/path');
-
+    
     // Mock path.join to return a predictable path
     path.join.mockImplementation((...args) => args.join('/'));
-
+    
     // Mock fs.existsSync to return true by default
-    existsSync.mockReturnValue(true);
+    fs.existsSync.mockReturnValue(true);
   });
 
   it('should return early if uploads directory does not exist', async () => {
     // Mock fs.existsSync to return false for this test
-    existsSync.mockReturnValue(false);
+    fs.existsSync.mockReturnValue(false);
 
     const result = await cleanupOldUploads();
 
     expect(result).toEqual({ deleted: 0, errors: 0 });
-    expect(fs.promises.readdir).not.toHaveBeenCalled();
+    expect(fsPromises.readdir).not.toHaveBeenCalled();
   });
 
   it('should delete files older than the specified age', async () => {
@@ -52,21 +54,22 @@ describe('Cleanup Utility', () => {
     const now = Date.now();
     jest.spyOn(Date, 'now').mockReturnValue(now);
 
-    // Mock fs.promises.readdir to return a list of files
-    fs.promises.readdir.mockResolvedValue(['file1.jpg', 'file2.png', '.gitkeep']);
+    // Mock readdir to return a list of files
+    fsPromises.readdir.mockResolvedValue(['file1.jpg', 'file2.png', '.gitkeep']);
 
-    // Mock fs.promises.stat to return file stats
+    // Mock stat to return file stats
     // file1.jpg is older than maxAge, file2.png is newer
-    fs.promises.stat.mockImplementation((filePath) => {
+    fsPromises.stat.mockImplementation((filePath) => {
       if (filePath.includes('file1')) {
         return Promise.resolve({
           mtimeMs: now - 2 * 60 * 60 * 1000, // 2 hours old
         });
-      } else {
+      } else if (filePath.includes('file2')) {
         return Promise.resolve({
           mtimeMs: now - 30 * 60 * 1000, // 30 minutes old
         });
       }
+      return Promise.reject(new Error('Unexpected file path'));
     });
 
     // Run the cleanup with a maxAge of 1 hour
@@ -79,11 +82,11 @@ describe('Cleanup Utility', () => {
   });
 
   it('should handle errors when processing files', async () => {
-    // Mock fs.promises.readdir to return a list of files
-    fs.promises.readdir.mockResolvedValue(['file1.jpg', 'file2.png']);
+    // Mock readdir to return a list of files
+    fsPromises.readdir.mockResolvedValue(['file1.jpg', 'file2.png']);
 
-    // Mock fs.promises.stat to throw an error for file1.jpg
-    fs.promises.stat.mockImplementation((filePath) => {
+    // Mock stat to throw an error for file1.jpg
+    fsPromises.stat.mockImplementation((filePath) => {
       if (filePath.includes('file1')) {
         return Promise.reject(new Error('Test error'));
       } else {
@@ -103,16 +106,16 @@ describe('Cleanup Utility', () => {
   });
 
   it('should handle errors when deleting files', async () => {
-    // Mock fs.promises.readdir to return a list of files
-    fs.promises.readdir.mockResolvedValue(['file1.jpg']);
+    // Mock readdir to return a list of files
+    fsPromises.readdir.mockResolvedValue(['file1.jpg']);
 
-    // Mock fs.promises.stat to return old file stats
-    fs.promises.stat.mockResolvedValue({
+    // Mock stat to return old file stats
+    fsPromises.stat.mockResolvedValue({
       mtimeMs: Date.now() - 2 * 60 * 60 * 1000, // 2 hours old
     });
 
-    // Mock fs.promises.unlink to throw an error
-    fs.promises.unlink.mockRejectedValue(new Error('Unlink error'));
+    // Mock unlink to throw an error
+    fsPromises.unlink.mockRejectedValueOnce(new Error('Unlink error'));
 
     // Run the cleanup
     const result = await cleanupOldUploads();
@@ -122,11 +125,11 @@ describe('Cleanup Utility', () => {
   });
 
   it('should skip .gitkeep file', async () => {
-    // Mock fs.promises.readdir to return a list of files including .gitkeep
-    fs.promises.readdir.mockResolvedValue(['file1.jpg', '.gitkeep']);
+    // Mock readdir to return a list of files including .gitkeep
+    fsPromises.readdir.mockResolvedValue(['file1.jpg', '.gitkeep']);
 
-    // Mock fs.promises.stat to return old file stats
-    fs.promises.stat.mockResolvedValue({
+    // Mock stat to return old file stats
+    fsPromises.stat.mockResolvedValue({
       mtimeMs: Date.now() - 2 * 60 * 60 * 1000, // 2 hours old
     });
 
