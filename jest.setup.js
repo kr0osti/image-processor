@@ -60,43 +60,7 @@ process.env.NEXT_PUBLIC_SITE_DESCRIPTION = 'Test environment for image processin
 process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000';
 process.env.CLEANUP_API_KEY = 'test-api-key';
 
-// Mock Next.js server
-jest.mock('next/server', () => {
-  return {
-    NextResponse: {
-      json: jest.fn((data, options) => {
-        return {
-          status: options?.status || 200,
-          headers: new Map(Object.entries(options?.headers || {})),
-          json: async () => data,
-        };
-      }),
-      redirect: jest.fn((url) => {
-        return {
-          status: 302,
-          headers: new Map([['Location', url]]),
-        };
-      }),
-    },
-    NextRequest: class NextRequest extends global.Request {
-      constructor(url, options = {}) {
-        super(url, options);
-        this.nextUrl = new URL(url);
-      }
-
-      get cookies() {
-        return {
-          get: jest.fn(),
-          getAll: jest.fn(),
-          set: jest.fn(),
-          delete: jest.fn(),
-          has: jest.fn(),
-          clear: jest.fn(),
-        };
-      }
-    },
-  };
-});
+// We're using manual mocks for next/server in __mocks__/next/server.js
 
 // Mock canvas for testing
 global.HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
