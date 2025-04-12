@@ -62,50 +62,58 @@ process.env.CLEANUP_API_KEY = 'test-api-key';
 
 // We're using manual mocks for next/server in __mocks__/next/server.js
 
-// Mock canvas for testing
-global.HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
-  fillRect: jest.fn(),
-  clearRect: jest.fn(),
-  getImageData: jest.fn(() => ({
-    data: new Array(4).fill(0),
-  })),
-  putImageData: jest.fn(),
-  createImageData: jest.fn(() => []),
-  setTransform: jest.fn(),
-  drawImage: jest.fn(),
-  save: jest.fn(),
-  restore: jest.fn(),
-  scale: jest.fn(),
-  rotate: jest.fn(),
-  translate: jest.fn(),
-  transform: jest.fn(),
-  fillText: jest.fn(),
-  measureText: jest.fn(() => ({ width: 0 })),
-  fillStyle: 'white',
-}));
+// Mock canvas for testing only if in a browser environment
+if (typeof window !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
+  global.HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
+    fillRect: jest.fn(),
+    clearRect: jest.fn(),
+    getImageData: jest.fn(() => ({
+      data: new Array(4).fill(0),
+    })),
+    putImageData: jest.fn(),
+    createImageData: jest.fn(() => []),
+    setTransform: jest.fn(),
+    drawImage: jest.fn(),
+    save: jest.fn(),
+    restore: jest.fn(),
+    scale: jest.fn(),
+    rotate: jest.fn(),
+    translate: jest.fn(),
+    transform: jest.fn(),
+    fillText: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillStyle: 'white',
+  }));
+}
 
 // Mock crypto for testing
-global.crypto = {
-  randomBytes: jest.fn(() => ({
-    toString: jest.fn(() => 'test-random-string'),
-  })),
-  subtle: {
-    digest: jest.fn(),
-  },
-  getRandomValues: jest.fn(() => new Uint8Array(16)),
-};
+if (!global.crypto) {
+  global.crypto = {
+    randomBytes: jest.fn(() => ({
+      toString: jest.fn(() => 'test-random-string'),
+    })),
+    subtle: {
+      digest: jest.fn(),
+    },
+    getRandomValues: jest.fn(() => new Uint8Array(16)),
+  };
+}
 
-// Mock URL.createObjectURL and URL.revokeObjectURL
-global.URL.createObjectURL = jest.fn(() => 'blob:test-url');
-global.URL.revokeObjectURL = jest.fn();
+// Mock URL.createObjectURL and URL.revokeObjectURL if in a browser environment
+if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+  global.URL.createObjectURL = jest.fn(() => 'blob:test-url');
+  global.URL.revokeObjectURL = jest.fn();
+}
 
-// Mock fetch
-global.fetch = jest.fn(() =>
-  Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve({}),
-    text: () => Promise.resolve(''),
-    blob: () => Promise.resolve(new Blob()),
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-  })
-);
+// Mock fetch if not already defined
+if (!global.fetch) {
+  global.fetch = jest.fn(() =>
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(''),
+      blob: () => Promise.resolve(typeof Blob !== 'undefined' ? new Blob() : {}),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    })
+  );
+}

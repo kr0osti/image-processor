@@ -45,8 +45,9 @@ jobs:
               - '!**/__tests__/**'
               - '!**/e2e/**'
               - '!**/*.md'
-              - '!.github/workflows/test.yml'
-              - '!.github/workflows/accessibility.yml'
+              - '!.github/workflows/**'
+              - '!jest.*.js'
+              - '!**/__mocks__/**'
               - '**'
 
       - name: Output build decision
