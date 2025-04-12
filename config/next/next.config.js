@@ -1,6 +1,3 @@
-// Import the Next.js config from the config directory
-// The actual configuration is in config/next/next.config.js
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
