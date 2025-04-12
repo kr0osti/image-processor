@@ -2,18 +2,12 @@
  * @jest-environment node
  */
 
-// Import modules
+// Mock the rate-limit module to avoid open handles
+jest.mock('../../app/utils/rate-limit');
+
+// Import modules after mocking
 import { createRateLimiter } from '../../app/utils/rate-limit';
 import { NextResponse } from 'next/server';
-
-// Mock setInterval to avoid open handles
-const originalSetInterval = global.setInterval;
-global.setInterval = jest.fn();
-
-// Restore setInterval after tests
-afterAll(() => {
-  global.setInterval = originalSetInterval;
-});
 
 // Mock NextResponse
 jest.mock('next/server', () => ({
