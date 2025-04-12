@@ -134,7 +134,7 @@ jobs:
         if: env.SHOULD_BUILD == 'true'
         uses: docker/build-push-action@v5
         with:
-          context: ./docker
+          context: .
           file: ./docker/Dockerfile.cleanup
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-cleanup.outputs.tags }}
