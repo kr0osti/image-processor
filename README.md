@@ -190,6 +190,61 @@ pnpm install
 pnpm dev
 ```
 
+### Dependency Management
+
+This project uses pnpm for dependency management. The `pnpm-lock.yaml` file is required for Dependabot to properly identify and update vulnerable dependencies.
+
+If you need to regenerate the lockfile:
+
+```bash
+# Run the generate-lockfile script
+./generate-lockfile.sh
+
+# Or manually with pnpm
+pnpm install --lockfile-only
+```
+
+Always commit the updated `pnpm-lock.yaml` file when adding or updating dependencies.
+
+### Testing
+
+This project includes comprehensive test coverage with Jest for unit/integration tests and Playwright for end-to-end tests.
+
+#### Running Unit and Integration Tests
+
+```bash
+# Run all Jest tests
+pnpm test
+
+# Run tests in watch mode during development
+pnpm test:watch
+
+# Generate test coverage report
+pnpm test:coverage
+```
+
+#### Running End-to-End Tests
+
+```bash
+# Install Playwright browsers (first time only)
+pnpm exec playwright install --with-deps
+
+# Run all E2E tests
+pnpm test:e2e
+
+# Run E2E tests in a specific browser
+pnpm exec playwright test --project=chromium
+```
+
+#### GitHub Actions Integration
+
+Tests automatically run in GitHub Actions on push and pull requests. The workflow:
+
+1. Runs unit and integration tests with Jest
+2. Generates and uploads test coverage reports
+3. Runs end-to-end tests with Playwright
+4. Uploads Playwright test reports
+
 ### Project Structure
 
 - `/app`: Next.js App Router components and pages
@@ -233,11 +288,10 @@ This project uses GitHub Actions for continuous integration and deployment:
 - **Test**: Runs linting and tests on every push and pull request
 - **Security Scan**: Performs security scanning using Snyk and CodeQL
 - **Accessibility Testing**: Ensures the application meets WCAG accessibility standards
-- **Docker Build**: Builds and pushes Docker images for both the main app and cleanup service to GitHub Container Registry
 
 ### CD Workflows
 
-- **CD**: Pushes Docker images to GitHub Container Registry on main branch pushes and tags
+- **Docker Build**: Builds and pushes Docker images to GitHub Container Registry on main branch pushes and tags
   - Images are tagged with branch name, commit SHA, and semantic version (for tags)
   - These images are used by the default `docker-compose.yaml` configuration
 - **Deploy to Staging**: Automatically deploys to the staging environment on pushes to the develop branch
