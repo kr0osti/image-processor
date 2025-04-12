@@ -233,11 +233,10 @@ This project uses GitHub Actions for continuous integration and deployment:
 - **Test**: Runs linting and tests on every push and pull request
 - **Security Scan**: Performs security scanning using Snyk and CodeQL
 - **Accessibility Testing**: Ensures the application meets WCAG accessibility standards
-- **Docker Build**: Builds and pushes Docker images for both the main app and cleanup service to GitHub Container Registry
 
 ### CD Workflows
 
-- **CD**: Pushes Docker images to GitHub Container Registry on main branch pushes and tags
+- **Docker Build**: Builds and pushes Docker images to GitHub Container Registry on main branch pushes and tags
   - Images are tagged with branch name, commit SHA, and semantic version (for tags)
   - These images are used by the default `docker-compose.yaml` configuration
 - **Deploy to Staging**: Automatically deploys to the staging environment on pushes to the develop branch
