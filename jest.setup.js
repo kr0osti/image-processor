@@ -17,11 +17,86 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// Define global Request and Headers if not already defined
+if (typeof global.Request === 'undefined') {
+  global.Request = class Request {
+    constructor(url, options = {}) {
+      this.url = url;
+      this.method = options.method || 'GET';
+      this.headers = new Headers(options.headers || {});
+      this.body = options.body || null;
+    }
+  };
+}
+
+if (typeof global.Headers === 'undefined') {
+  global.Headers = class Headers {
+    constructor(init = {}) {
+      this.headers = new Map();
+      if (init) {
+        Object.entries(init).forEach(([key, value]) => {
+          this.headers.set(key.toLowerCase(), value);
+        });
+      }
+    }
+
+    get(name) {
+      return this.headers.get(name.toLowerCase()) || null;
+    }
+
+    set(name, value) {
+      this.headers.set(name.toLowerCase(), value);
+    }
+
+    has(name) {
+      return this.headers.has(name.toLowerCase());
+    }
+  };
+}
+
 // Mock environment variables
 process.env.NEXT_PUBLIC_SITE_NAME = 'NextJS Image Processor Test';
 process.env.NEXT_PUBLIC_SITE_DESCRIPTION = 'Test environment for image processing';
 process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000';
 process.env.CLEANUP_API_KEY = 'test-api-key';
+
+// Mock Next.js server
+jest.mock('next/server', () => {
+  return {
+    NextResponse: {
+      json: jest.fn((data, options) => {
+        return {
+          status: options?.status || 200,
+          headers: new Map(Object.entries(options?.headers || {})),
+          json: async () => data,
+        };
+      }),
+      redirect: jest.fn((url) => {
+        return {
+          status: 302,
+          headers: new Map([['Location', url]]),
+        };
+      }),
+    },
+    NextRequest: class NextRequest extends global.Request {
+      constructor(url, options = {}) {
+        super(url, options);
+        this.nextUrl = new URL(url);
+      }
+
+      get cookies() {
+        return {
+          get: jest.fn(),
+          getAll: jest.fn(),
+          set: jest.fn(),
+          delete: jest.fn(),
+          has: jest.fn(),
+          clear: jest.fn(),
+        };
+      }
+    },
+  };
+});
 
 // Mock canvas for testing
 global.HTMLCanvasElement.prototype.getContext = jest.fn(() => ({

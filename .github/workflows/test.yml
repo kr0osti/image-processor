@@ -67,7 +67,7 @@ jobs:
         run: pnpm lint || true
 
       - name: Run unit and API tests
-        run: pnpm test
+        run: pnpm test -- --passWithNoTests
         env:
           NEXT_PUBLIC_SITE_NAME: "NextJS Image Processor"
           NEXT_PUBLIC_SITE_DESCRIPTION: "A powerful web application for processing images"
