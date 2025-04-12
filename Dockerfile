@@ -8,6 +8,8 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml* ./
 RUN apk add --no-cache curl
 RUN npm install -g pnpm
+# Make sure pnpm is in the PATH
+ENV PATH="/usr/local/bin:$PATH"
 RUN pnpm install
 
 # Rebuild the source code only when needed
@@ -15,6 +17,10 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Install pnpm in the builder stage
+RUN npm install -g pnpm
+ENV PATH="/usr/local/bin:$PATH"
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
