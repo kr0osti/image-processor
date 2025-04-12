@@ -452,15 +452,76 @@ export default function ImageProcessor() {
     }
   }
 
-  // Update the function that handles the image URL
+  /**
+   * Compresses an image data URL to reduce its size before sending to the server
+   *
+   * @param {string} dataUrl - The data URL of the image to compress
+   * @returns {Promise<string>} A promise that resolves to the compressed data URL
+   */
+  const compressImageDataUrl = (dataUrl: string): Promise<string> => {
+    if (!isBrowser) return Promise.resolve(dataUrl)
+
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        // Create a canvas to draw the compressed image
+        const canvas = document.createElement('canvas')
+
+        // Set max dimensions to reduce size while maintaining quality
+        const maxDimension = 1500
+        const scale = Math.min(1, maxDimension / Math.max(img.width, img.height))
+        canvas.width = img.width * scale
+        canvas.height = img.height * scale
+
+        // Get context and draw image
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        if (!ctx) {
+          addLog("Failed to get canvas context for compression")
+          resolve(dataUrl) // Return original if compression fails
+          return
+        }
+
+        // Draw image with smoothing for better quality
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = 'high'
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+        // Convert to data URL with reduced quality (0.8 is a good balance)
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8)
+        resolve(compressedDataUrl)
+      }
+
+      img.onerror = () => {
+        addLog("Failed to load image for compression")
+        resolve(dataUrl) // Return original if compression fails
+      }
+
+      img.src = dataUrl
+    })
+  }
+
+  /**
+   * Converts a data URL to a real URL by sending it to the server for processing
+   * Includes timeout handling and error management
+   *
+   * @param {string} dataUrl - The data URL to convert
+   * @returns {Promise<string|null>} A promise that resolves to the URL of the saved image, or null if an error occurred
+   */
   const convertDataUrlToRealUrl = async (dataUrl: string): Promise<string | null> => {
     try {
+      // Create an AbortController to handle timeouts
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+      addLog(`Sending image data to server (size: ${Math.round(dataUrl.length / 1024)} KB)`)
+
       const response = await fetch('/api/images', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ dataUrl }),
+        signal: controller.signal
       });
 
       if (!response.ok) {
@@ -469,13 +530,23 @@ export default function ImageProcessor() {
 
       const data = await response.json();
 
+      // Clear the timeout
+      clearTimeout(timeoutId);
+
       if (data.success) {
         // Return the API URL which should work more reliably
+        addLog(`Image successfully saved to server`)
         return data.apiUrl || data.url;
       } else {
         throw new Error(data.message || 'Failed to save image');
       }
     } catch (error) {
+      // Check if this was an abort error (timeout)
+      if (error.name === 'AbortError') {
+        addLog(`Request timed out after 60 seconds. The server might be overloaded or the image might be too large.`);
+      } else {
+        addLog(`Error saving image to server: ${error.message}`);
+      }
       console.error('Error converting data URL to real URL:', error);
       return null;
     }
@@ -503,8 +574,12 @@ export default function ImageProcessor() {
         }
 
         if (processedImage) {
+          // Compress the image data before sending to server
+          const compressedImage = await compressImageDataUrl(processedImage)
+          addLog(`Compressed image ${index + 1} from ${Math.round(processedImage.length / 1024)} KB to ${Math.round(compressedImage.length / 1024)} KB`)
+
           // Convert data URL to real URL
-          const realUrl = await convertDataUrlToRealUrl(processedImage)
+          const realUrl = await convertDataUrlToRealUrl(compressedImage)
           if (realUrl !== null) {
             processed.push(realUrl)
             addLog(`Successfully processed image ${index + 1}`)
