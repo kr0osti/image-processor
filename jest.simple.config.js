@@ -1,15 +1,12 @@
 const nextJest = require('next/jest');
 
 const createJestConfig = nextJest({
-  // Provide the path to your Next.js app to load next.config.js and .env files in your test environment
   dir: './',
 });
 
 // Add any custom config to be passed to Jest
 const customJestConfig = {
-  setupFilesAfterEnv: [
-    process.env.NODE_ENV === 'test-node' ? './jest.node.setup.js' : './jest.setup.js',
-  ],
+  // Remove the problematic setupFilesAfterEnv
   testEnvironment: 'jest-environment-jsdom',
   forceExit: true,
   testMatch: [
@@ -17,14 +14,10 @@ const customJestConfig = {
     '**/?(*.)+(spec|test).(js|jsx|ts|tsx)',
   ],
   moduleNameMapper: {
-    // Handle module aliases (if you have them in tsconfig.json)
     '^@/(.*)$': '<rootDir>/$1',
   },
-  // Add more setup options before each test is run
-  // setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/', '<rootDir>/e2e/'],
   transform: {
-    // Use babel-jest to transpile tests with the next/babel preset
     '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
   },
   transformIgnorePatterns: [

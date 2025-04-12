@@ -58,10 +58,174 @@ jobs:
             pnpm add -D jest @testing-library/jest-dom @testing-library/react jest-environment-jsdom
           fi
 
-      - name: Create uploads directory
+      - name: Create uploads directory and ensure Jest setup files exist
         run: |
           mkdir -p public/uploads
           chmod -R 777 public/uploads
+
+          # Ensure Jest setup files exist
+          mkdir -p config/jest
+
+          # Create jest.node.setup.js if it doesn't exist
+          if [ ! -f config/jest/jest.node.setup.js ]; then
+            echo "Creating jest.node.setup.js..."
+            cat > config/jest/jest.node.setup.js << 'EOL'
+// Setup file for Node.js environment tests
+
+// Mock environment variables
+process.env.NEXT_PUBLIC_SITE_NAME = 'NextJS Image Processor Test';
+process.env.NEXT_PUBLIC_SITE_DESCRIPTION = 'Test environment for image processing';
+process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000';
+process.env.CLEANUP_API_KEY = 'test-api-key';
+
+// Mock the Next.js router
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    refresh: jest.fn(),
+    pathname: '/',
+    query: {},
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+// Mock next/server
+jest.mock('next/server', () => {
+  const mockJson = jest.fn((data, options = {}) => ({
+    status: options.status || 200,
+    headers: new Map(Object.entries(options.headers || {})),
+    json: async () => data,
+  }));
+
+  const mockRedirect = jest.fn((url) => ({
+    status: 302,
+    headers: new Map([['Location', url]]),
+  }));
+
+  return {
+    NextResponse: {
+      json: mockJson,
+      redirect: mockRedirect,
+    },
+  };
+});
+
+// Silence console output in tests
+console.log = jest.fn();
+console.error = jest.fn();
+console.warn = jest.fn();
+EOL
+          fi
+
+          # Create jest.setup.js if it doesn't exist
+          if [ ! -f config/jest/jest.setup.js ]; then
+            echo "Creating jest.setup.js..."
+            cat > config/jest/jest.setup.js << 'EOL'
+// Setup file for browser environment tests
+import '@testing-library/jest-dom';
+
+// Mock environment variables
+process.env.NEXT_PUBLIC_SITE_NAME = 'NextJS Image Processor Test';
+process.env.NEXT_PUBLIC_SITE_DESCRIPTION = 'Test environment for image processing';
+process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000';
+process.env.CLEANUP_API_KEY = 'test-api-key';
+
+// Mock the Next.js router
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    refresh: jest.fn(),
+    pathname: '/',
+    query: {},
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+// Mock next/server
+jest.mock('next/server', () => {
+  const mockJson = jest.fn((data, options = {}) => ({
+    status: options.status || 200,
+    headers: new Map(Object.entries(options.headers || {})),
+    json: async () => data,
+  }));
+
+  const mockRedirect = jest.fn((url) => ({
+    status: 302,
+    headers: new Map([['Location', url]]),
+  }));
+
+  return {
+    NextResponse: {
+      json: mockJson,
+      redirect: mockRedirect,
+    },
+  };
+});
+
+// Mock window.URL.createObjectURL
+if (typeof window !== 'undefined') {
+  window.URL.createObjectURL = jest.fn(() => 'mock-object-url');
+  window.URL.revokeObjectURL = jest.fn();
+}
+
+// Mock IntersectionObserver
+class MockIntersectionObserver {
+  constructor(callback) {
+    this.callback = callback;
+    this.elements = new Set();
+    this.mockIsIntersecting = true;
+  }
+
+  observe(element) {
+    this.elements.add(element);
+    this.callback([
+      {
+        isIntersecting: this.mockIsIntersecting,
+        target: element,
+        intersectionRatio: 1,
+      },
+    ]);
+  }
+
+  unobserve(element) {
+    this.elements.delete(element);
+  }
+
+  disconnect() {
+    this.elements.clear();
+  }
+
+  // Helper for tests
+  setMockIsIntersecting(isIntersecting) {
+    this.mockIsIntersecting = isIntersecting;
+    this.callback(
+      [...this.elements].map((element) => ({
+        isIntersecting,
+        target: element,
+        intersectionRatio: isIntersecting ? 1 : 0,
+      }))
+    );
+  }
+}
+
+global.IntersectionObserver = MockIntersectionObserver;
+
+// Silence console output in tests
+console.log = jest.fn();
+console.error = jest.fn();
+console.warn = jest.fn();
+EOL
+          fi
 
       - name: Run linting
         run: pnpm lint --config config/eslint/.eslintrc.json || true
@@ -69,7 +233,7 @@ jobs:
       - name: Run unit and API tests
         run: |
           echo "Running tests with NODE_ENV=test-node"
-          NODE_ENV=test-node pnpm test -- --passWithNoTests --testEnvironment=node --detectOpenHandles --forceExit --no-cache --testTimeout=70000
+          NODE_ENV=test-node pnpm test -- --passWithNoTests --testEnvironment=node --detectOpenHandles --forceExit --no-cache --testTimeout=70000 --config=config/jest/jest.config.js
         env:
           NEXT_PUBLIC_SITE_NAME: "NextJS Image Processor"
           NEXT_PUBLIC_SITE_DESCRIPTION: "A powerful web application for processing images"
