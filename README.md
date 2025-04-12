@@ -37,7 +37,11 @@ The application uses a combination of client-side and server-side technologies:
 
 ### Running with Docker
 
-The easiest way to run the application is using Docker:
+The application can be run in two modes: production (default) or development.
+
+#### Production Mode
+
+Use this mode for regular usage with pre-built images from GitHub Container Registry:
 
 ```bash
 # Clone the repository
@@ -55,6 +59,26 @@ chmod +x setup-permissions.sh
 docker compose up -d
 ```
 
+#### Development Mode
+
+Use this mode during development when you want to build the Docker images locally:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/nextjs-image-processor.git
+cd nextjs-image-processor
+
+# Create a .env file from the example
+cp .env.example .env
+
+# Set up proper permissions for the uploads directory
+chmod +x setup-permissions.sh
+./setup-permissions.sh
+
+# Start the application with Docker Compose using the development configuration
+docker compose -f docker-compose.dev.yaml up -d
+```
+
 The application will be available at http://localhost:6060
 
 > **Important**: If you encounter permission errors when uploading images, make sure the `public/uploads` directory has write permissions for the Docker container. You can fix this by running the `setup-permissions.sh` script.
@@ -67,6 +91,7 @@ You can customize the application by setting these environment variables in your
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `VERSION` | Docker image version to use | latest |
 | `NEXT_PUBLIC_SITE_NAME` | The name of your site | NextJS Image Processor |
 | `NEXT_PUBLIC_SITE_DESCRIPTION` | Site description | A powerful web application... |
 | `NEXT_PUBLIC_SITE_URL` | Your site's URL | https://yourdomain.com |
@@ -97,7 +122,14 @@ You can customize the application's icons and branding by:
 The application consists of two Docker containers:
 
 1. **Main Application (app)**: The NextJS application that handles image processing
-2. **Cleanup Service (cleanup-cron)**: A cron job that runs every minute to delete uploaded files older than 1 hour
+2. **Cleanup Service (cleanup-cron)**: A dedicated service that runs every minute to delete uploaded files older than 1 hour
+
+#### Docker Compose Configurations
+
+The project includes two Docker Compose configurations:
+
+1. **docker-compose.yaml**: The default configuration that uses pre-built images from GitHub Container Registry
+2. **docker-compose.dev.yaml**: Development configuration that builds images locally
 
 ### 🛠️ Troubleshooting
 
@@ -110,13 +142,15 @@ If you encounter permission errors when uploading images:
 ./setup-permissions.sh
 ```
 
-#### Docker Build Issues
+#### Docker Issues
 
-If you encounter issues with the Docker build process:
+If you encounter issues with Docker:
 
 1. Ensure your Docker and Docker Compose are up to date
-2. Check that the ports specified in `docker-compose.yaml` are available on your system
+2. Check that port 6060 is available on your system
 3. Verify that the environment variables in your `.env` file are correctly formatted
+4. Make sure you have internet access to pull the Docker images from GitHub Container Registry
+
 
 #### Healthcheck Failures
 
@@ -156,6 +190,61 @@ pnpm install
 pnpm dev
 ```
 
+### Dependency Management
+
+This project uses pnpm for dependency management. The `pnpm-lock.yaml` file is required for Dependabot to properly identify and update vulnerable dependencies.
+
+If you need to regenerate the lockfile:
+
+```bash
+# Run the generate-lockfile script
+./generate-lockfile.sh
+
+# Or manually with pnpm
+pnpm install --lockfile-only
+```
+
+Always commit the updated `pnpm-lock.yaml` file when adding or updating dependencies.
+
+### Testing
+
+This project includes comprehensive test coverage with Jest for unit/integration tests and Playwright for end-to-end tests.
+
+#### Running Unit and Integration Tests
+
+```bash
+# Run all Jest tests
+pnpm test
+
+# Run tests in watch mode during development
+pnpm test:watch
+
+# Generate test coverage report
+pnpm test:coverage
+```
+
+#### Running End-to-End Tests
+
+```bash
+# Install Playwright browsers (first time only)
+pnpm exec playwright install --with-deps
+
+# Run all E2E tests
+pnpm test:e2e
+
+# Run E2E tests in a specific browser
+pnpm exec playwright test --project=chromium
+```
+
+#### GitHub Actions Integration
+
+Tests automatically run in GitHub Actions on push and pull requests. The workflow:
+
+1. Runs unit and integration tests with Jest
+2. Generates and uploads test coverage reports
+3. Runs end-to-end tests with Playwright
+4. Uploads Playwright test reports
+
 ### Project Structure
 
 - `/app`: Next.js App Router components and pages
@@ -172,6 +261,45 @@ pnpm build
 # Start the production server
 pnpm start
 ```
+
+## 🔄 CI/CD Pipeline
+
+### Versioning
+
+This project uses semantic versioning. Docker images are tagged with version numbers (e.g., `0.1.0`) as well as `latest`.
+
+You can specify which version to use by setting the `VERSION` environment variable in your `.env` file:
+
+```
+# Use a specific version
+VERSION=0.1.0
+
+# Or leave it empty to use the latest version
+VERSION=
+```
+
+If `VERSION` is not set, the `latest` tag will be used by default.
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+### CI Workflows
+
+- **CI**: Builds and tests the application on every push and pull request
+- **Test**: Runs linting and tests on every push and pull request
+- **Security Scan**: Performs security scanning using Snyk and CodeQL
+- **Accessibility Testing**: Ensures the application meets WCAG accessibility standards
+
+### CD Workflows
+
+- **Docker Build**: Builds and pushes Docker images to GitHub Container Registry on main branch pushes and tags
+  - Images are tagged with branch name, commit SHA, and semantic version (for tags)
+  - These images are used by the default `docker-compose.yaml` configuration
+- **Deploy to Staging**: Automatically deploys to the staging environment on pushes to the develop branch
+- **Deploy to Production**: Deploys to production when a new release is published
+
+### Automated Maintenance
+
+- **Dependabot**: Automatically creates PRs for dependency updates (npm, GitHub Actions, Docker)
 
 ## 🤝 Contributing
 

@@ -1,0 +1,26 @@
+{
+  "defaults": {
+    "timeout": 30000,
+    "wait": 2000,
+    "standard": "WCAG2AA",
+    "ignore": [
+      "notice"
+    ],
+    "chromeLaunchConfig": {
+      "args": [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    },
+    "headers": {
+      "User-Agent": "pa11y-ci/GitHub-Actions"
+    }
+  },
+  "urls": [
+    "http://localhost:3000/",
+    "http://localhost:3000/?tab=url",
+    "http://localhost:3000/?tab=web"
+  ]
+}

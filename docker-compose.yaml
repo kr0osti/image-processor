@@ -1,20 +1,16 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
+    image: ghcr.io/kr0osti/image-processor/nextjs-app:${VERSION:-latest}
     container_name: nextjs-image-processor
     restart: unless-stopped
-    user: "1001:1001" 
+    user: "1001:1001"
     ports:
       - "6060:3000"
     environment:
-      - NODE_ENV=${NODE_ENV}
-      - NODE_OPTIONS=${NODE_OPTIONS}
-      - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
-      - HOSTNAME=${HOSTNAME}
+      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_OPTIONS=${NODE_OPTIONS:-"--max-old-space-size=4096"}
+      - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG:-false}
+      - HOSTNAME=${HOSTNAME:-0.0.0.0}
       - NEXT_PUBLIC_SITE_NAME=${NEXT_PUBLIC_SITE_NAME}
       - NEXT_PUBLIC_SITE_DESCRIPTION=${NEXT_PUBLIC_SITE_DESCRIPTION}
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
@@ -32,30 +28,11 @@ services:
       start_period: 30s
 
   cleanup-cron:
-    image: alpine:latest
+    image: ghcr.io/kr0osti/image-processor/cleanup-service:${VERSION:-latest}
     restart: unless-stopped
     container_name: nextjs-image-cleanup
     depends_on:
       - app
-    command: >
-      /bin/sh -c "
-        apk add --no-cache curl logrotate;
-        mkdir -p /etc/logrotate.d;
-        echo '/var/log/cron.log {
-          daily
-          rotate 7
-          compress
-          missingok
-          size 10M
-          create 0644 root root
-        }' > /etc/logrotate.d/cron;
-        touch /var/log/cron.log;
-        echo '* * * * * curl -s http://app:3000/api/cleanup?key=${CLEANUP_API_KEY} >> /var/log/cron.log 2>&1' > /etc/crontabs/root;
-        echo '0 0 * * * logrotate /etc/logrotate.d/cron --state /var/lib/logrotate/logrotate.status' >> /etc/crontabs/root;
-        mkdir -p /var/lib/logrotate;
-        touch /var/lib/logrotate/logrotate.status;
-        crond -f -d 8
-      "
     environment:
       - CLEANUP_API_KEY=${CLEANUP_API_KEY}
     volumes:

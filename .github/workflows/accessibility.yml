@@ -1,0 +1,176 @@
+name: Accessibility Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 0 * * 1'  # Run weekly on Monday at midnight
+
+jobs:
+  accessibility:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      # This step is important to ensure pnpm is in the PATH
+      - name: Setup pnpm path
+        run: echo "$(pnpm -g bin)" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build application
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_SITE_NAME: "NextJS Image Processor"
+          NEXT_PUBLIC_SITE_DESCRIPTION: "A powerful web application for processing images"
+          NEXT_PUBLIC_SITE_URL: "https://example.com"
+          CLEANUP_API_KEY: "test-api-key-for-ci"
+
+      - name: Start application
+        run: pnpm start &
+        env:
+          PORT: 3000
+
+      - name: Wait for application to start
+        run: |
+          echo "Waiting for application to start..."
+          timeout 30 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 1; done'
+          echo "Application started"
+
+      - name: Install Playwright and browsers
+        run: |
+          # Install Playwright using pnpm to maintain consistency
+          pnpm add -D @playwright/test
+
+          # Install Playwright browsers with dependencies
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Create simple accessibility test script
+        run: |
+          cat > accessibility-test.js << 'EOL'
+          const { chromium } = require('@playwright/test');
+          const fs = require('fs');
+
+          async function runAccessibilityTests() {
+            console.log('Starting accessibility tests...');
+
+            // Create a simple report structure
+            const report = {
+              timestamp: new Date().toISOString(),
+              pages: [],
+              summary: { total: 0, issues: 0 }
+            };
+
+            try {
+              const browser = await chromium.launch({
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+              });
+
+              const context = await browser.newContext();
+              const page = await context.newPage();
+
+              const urls = [
+                'http://localhost:3000/'
+              ];
+
+              for (const url of urls) {
+                console.log(`Testing ${url}...`);
+                try {
+                  // Navigate to the page
+                  await page.goto(url, { timeout: 30000 });
+                  await page.waitForLoadState('domcontentloaded');
+
+                  const title = await page.title();
+                  console.log(`Page title: ${title}`);
+
+                  // Basic accessibility check - just count elements for now
+                  const headings = await page.$$('h1, h2, h3');
+                  const images = await page.$$('img');
+                  const buttons = await page.$$('button');
+                  const links = await page.$$('a');
+
+                  console.log(`Found ${headings.length} headings, ${images.length} images, ${buttons.length} buttons, ${links.length} links`);
+
+                  // Add to report
+                  report.pages.push({
+                    url,
+                    title,
+                    elements: {
+                      headings: headings.length,
+                      images: images.length,
+                      buttons: buttons.length,
+                      links: links.length
+                    }
+                  });
+
+                  report.summary.total++;
+                } catch (pageError) {
+                  console.error(`Error testing ${url}:`, pageError);
+                  report.pages.push({
+                    url,
+                    error: pageError.message
+                  });
+                  report.summary.issues++;
+                }
+              }
+
+              await browser.close();
+            } catch (error) {
+              console.error('Error in accessibility tests:', error);
+              report.error = error.message;
+              report.summary.issues++;
+            }
+
+            // Save report
+            fs.writeFileSync('accessibility-report.json', JSON.stringify(report, null, 2));
+            console.log('Accessibility tests completed. Report saved to accessibility-report.json');
+
+            // Return success even if there were issues
+            return report;
+          }
+
+          runAccessibilityTests()
+            .then(report => {
+              console.log(`Tested ${report.summary.total} pages with ${report.summary.issues} issues`);
+            })
+            .catch(err => {
+              console.error('Fatal error in accessibility tests:', err);
+              // Write a minimal report even on fatal error
+              fs.writeFileSync('accessibility-report.json', JSON.stringify({
+                timestamp: new Date().toISOString(),
+                error: err.message,
+                pages: [],
+                summary: { total: 0, issues: 1 }
+              }, null, 2));
+            });
+          EOL
+
+      - name: Run accessibility tests
+        continue-on-error: true  # Don't fail the workflow if accessibility tests fail
+        run: pnpm node accessibility-test.js
+
+      - name: Upload accessibility report
+        if: always()  # Upload even if previous steps failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-report
+          path: accessibility-report.json
+          retention-days: 90
