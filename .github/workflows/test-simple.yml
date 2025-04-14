@@ -21,7 +21,10 @@ jobs:
 
       # This step is important to ensure pnpm is in the PATH
       - name: Setup pnpm path
-        run: echo "$(pnpm -g bin)" >> $GITHUB_PATH
+        run: |
+          echo "$(npm bin -g)" >> $GITHUB_PATH
+          npm install -g pnpm@8
+          echo "$(pnpm -g bin)" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: pnpm install
