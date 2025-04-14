@@ -40,15 +40,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install
       
-      - name: Create uploads directory
-        run: |
-          mkdir -p public/uploads
-          chmod -R 777 public/uploads
-      
       - name: Run tests
-        run: NODE_ENV=test-node pnpm test
-        env:
-          NEXT_PUBLIC_SITE_NAME: "NextJS Image Processor"
-          NEXT_PUBLIC_SITE_DESCRIPTION: "A powerful web application for processing images"
-          NEXT_PUBLIC_SITE_URL: "https://example.com"
-          CLEANUP_API_KEY: "test-api-key-for-ci"
+        run: ./run-tests.sh

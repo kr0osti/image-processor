@@ -6,9 +6,25 @@ const createJestConfig = nextJest({
 });
 
 // Add any custom config to be passed to Jest
+const path = require('path');
+
+// Log the current directory and NODE_ENV for debugging
+console.log('Current directory:', __dirname);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+
+// Check if setup files exist
+const fs = require('fs');
+const nodeSetupPath = path.resolve(__dirname, './jest.node.setup.js');
+const browserSetupPath = path.resolve(__dirname, './jest.setup.js');
+
+console.log('Node setup file exists:', fs.existsSync(nodeSetupPath));
+console.log('Browser setup file exists:', fs.existsSync(browserSetupPath));
+
 const customJestConfig = {
   setupFilesAfterEnv: [
-    process.env.NODE_ENV === 'test-node' ? './config/jest/jest.node.setup.js' : './config/jest/jest.setup.js',
+    process.env.NODE_ENV === 'test-node'
+      ? nodeSetupPath
+      : browserSetupPath,
   ],
   testEnvironment: 'jest-environment-jsdom',
   forceExit: true,
