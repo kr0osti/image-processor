@@ -1,3 +1,6 @@
+// Import the function to test first
+import { GET } from '../../app/api/proxy/route';
+
 // Mock NextRequest and NextResponse
 class MockNextRequest {
   constructor(url) {
@@ -27,8 +30,6 @@ jest.mock('next/server', () => ({
   },
   NextRequest: MockNextRequest,
 }));
-
-import { GET } from '../../app/api/proxy/route';
 
 // Mock the rate limiter
 jest.mock('../../app/utils/rate-limit.js', () => ({
