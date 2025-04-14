@@ -1,24 +1,31 @@
-import { createRateLimiter } from '../../app/utils/rate-limit';
-import { NextResponse } from 'next/server';
+/**
+ * @jest-environment node
+ */
 
 // Mock NextResponse
+const mockJson = jest.fn((data, options = {}) => ({
+  status: options.status || 200,
+  headers: new Map(),
+  json: async () => data,
+}));
+
+// Mock next/server
 jest.mock('next/server', () => ({
   NextResponse: {
-    json: jest.fn((data, options) => ({
-      status: options?.status || 200,
-      headers: new Map(),
-      json: async () => data,
-    })),
+    json: mockJson,
   },
 }));
+
+// Import the module after mocking
+import { createRateLimiter } from '../../app/utils/rate-limit';
 
 describe('Rate Limiter Utility', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
-    // Reset the NextResponse mock
-    NextResponse.json.mockClear();
-    
+
+    // Reset the mockJson function
+    mockJson.mockClear();
+
     // Reset the Date.now mock if it exists
     if (Date.now.mockRestore) {
       Date.now.mockRestore();
@@ -91,8 +98,9 @@ describe('Rate Limiter Utility', () => {
     response = await rateLimiter(request);
     expect(response).not.toBeNull();
     expect(response.status).toBe(429);
-    
-    const data = await response.json();
+
+    // Get the data passed to NextResponse.json
+    const data = mockJson.mock.calls[0][0];
     expect(data).toHaveProperty('error', 'Too many requests');
   });
 

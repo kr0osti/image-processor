@@ -1,7 +1,24 @@
-import '../api/setup';
+/**
+ * @jest-environment node
+ */
+
+// Mock the NextResponse
+const mockJson = jest.fn((data, options = {}) => ({
+  status: options.status || 200,
+  headers: new Map(),
+  json: async () => data,
+}));
+
+// Mock next/server
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: mockJson,
+  },
+}));
+
+// Import the API route after mocking
 import { GET } from '../../app/api/cleanup/route';
 import { cleanupOldUploads } from '../../app/utils/cleanup';
-import { NextResponse } from 'next/server';
 
 // Mock the cleanup utility
 jest.mock('../../app/utils/cleanup', () => ({
@@ -17,11 +34,21 @@ describe('Cleanup API', () => {
   beforeEach(() => {
     // Reset mocks before each test
     jest.clearAllMocks();
+    // Set the API key for testing
+    process.env.CLEANUP_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    // Clean up environment variables
+    delete process.env.CLEANUP_API_KEY;
   });
 
   it('should return 401 if no API key is provided', async () => {
     // Create a mock request without an API key
-    const request = { url: 'http://localhost:3000/api/cleanup' };
+    const request = {
+      url: 'http://localhost:3000/api/cleanup',
+      nextUrl: new URL('http://localhost:3000/api/cleanup')
+    };
 
     // Call the API handler
     const response = await GET(request);
@@ -29,8 +56,8 @@ describe('Cleanup API', () => {
     // Verify the response
     expect(response.status).toBe(401);
 
-    // Parse the response body
-    const data = await response.json();
+    // Get the data passed to NextResponse.json
+    const data = mockJson.mock.calls[0][0];
 
     // Verify the response data
     expect(data).toEqual({ error: 'Unauthorized' });
@@ -41,13 +68,22 @@ describe('Cleanup API', () => {
 
   it('should return 401 if an invalid API key is provided', async () => {
     // Create a mock request with an invalid API key
-    const request = { url: 'http://localhost:3000/api/cleanup?key=invalid-key' };
+    const request = {
+      url: 'http://localhost:3000/api/cleanup?key=invalid-key',
+      nextUrl: new URL('http://localhost:3000/api/cleanup?key=invalid-key')
+    };
 
     // Call the API handler
     const response = await GET(request);
 
     // Verify the response
     expect(response.status).toBe(401);
+
+    // Get the data passed to NextResponse.json
+    const data = mockJson.mock.calls[0][0];
+
+    // Verify the response data
+    expect(data).toEqual({ error: 'Unauthorized' });
 
     // Verify that cleanupOldUploads was not called
     expect(cleanupOldUploads).not.toHaveBeenCalled();
@@ -58,7 +94,10 @@ describe('Cleanup API', () => {
     cleanupOldUploads.mockResolvedValue({ deleted: 5, errors: 0 });
 
     // Create a mock request with a valid API key
-    const request = { url: 'http://localhost:3000/api/cleanup?key=test-api-key' };
+    const request = {
+      url: 'http://localhost:3000/api/cleanup?key=test-api-key',
+      nextUrl: new URL('http://localhost:3000/api/cleanup?key=test-api-key')
+    };
 
     // Call the API handler
     const response = await GET(request);
@@ -66,8 +105,8 @@ describe('Cleanup API', () => {
     // Verify the response
     expect(response.status).toBe(200);
 
-    // Parse the response body
-    const data = await response.json();
+    // Get the data passed to NextResponse.json
+    const data = mockJson.mock.calls[0][0];
 
     // Verify the response data
     expect(data).toEqual({
@@ -86,7 +125,10 @@ describe('Cleanup API', () => {
     cleanupOldUploads.mockResolvedValue({ deleted: 3, errors: 1 });
 
     // Create a mock request with a valid API key and custom maxAge
-    const request = { url: 'http://localhost:3000/api/cleanup?key=test-api-key&maxAge=30' };
+    const request = {
+      url: 'http://localhost:3000/api/cleanup?key=test-api-key&maxAge=30',
+      nextUrl: new URL('http://localhost:3000/api/cleanup?key=test-api-key&maxAge=30')
+    };
 
     // Call the API handler
     const response = await GET(request);
@@ -94,8 +136,8 @@ describe('Cleanup API', () => {
     // Verify the response
     expect(response.status).toBe(200);
 
-    // Parse the response body
-    const data = await response.json();
+    // Get the data passed to NextResponse.json
+    const data = mockJson.mock.calls[0][0];
 
     // Verify the response data
     expect(data).toEqual({
@@ -114,7 +156,10 @@ describe('Cleanup API', () => {
     cleanupOldUploads.mockRejectedValue(new Error('Test error'));
 
     // Create a mock request with a valid API key
-    const request = { url: 'http://localhost:3000/api/cleanup?key=test-api-key' };
+    const request = {
+      url: 'http://localhost:3000/api/cleanup?key=test-api-key',
+      nextUrl: new URL('http://localhost:3000/api/cleanup?key=test-api-key')
+    };
 
     // Call the API handler
     const response = await GET(request);
@@ -122,8 +167,8 @@ describe('Cleanup API', () => {
     // Verify the response
     expect(response.status).toBe(500);
 
-    // Parse the response body
-    const data = await response.json();
+    // Get the data passed to NextResponse.json
+    const data = mockJson.mock.calls[0][0];
 
     // Verify the response data
     expect(data).toEqual({
