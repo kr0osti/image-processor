@@ -867,33 +867,73 @@ export default function ImageProcessor() {
     try {
       const zip = new JSZip()
 
-      // Add each image to the zip
-      processedImages.forEach((dataUrl, index) => {
-        // Convert data URL to blob
-        const imageData = dataUrl.split(",")[1]
-        const byteCharacters = atob(imageData)
-        const byteArrays = []
+      // Process each image and add to the zip
+      for (let index = 0; index < processedImages.length; index++) {
+        const imageUrl = processedImages[index]
+        addLog(`Processing image ${index + 1} for zip: ${imageUrl.substring(0, 50)}...`)
 
-        for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-          const slice = byteCharacters.slice(offset, offset + 512)
+        let blob: Blob
 
-          const byteNumbers = new Array(slice.length)
-          for (let i = 0; i < slice.length; i++) {
-            byteNumbers[i] = slice.charCodeAt(i)
+        // Check if it's a data URL or a server URL
+        if (imageUrl.startsWith('data:')) {
+          // It's a data URL, extract the base64 data
+          const matches = imageUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+
+          if (!matches || matches.length !== 3) {
+            addLog(`Invalid data URL format for image ${index + 1}, skipping`)
+            continue
           }
 
-          const byteArray = new Uint8Array(byteNumbers)
-          byteArrays.push(byteArray)
-        }
+          try {
+            const imageData = matches[2]
+            const byteCharacters = atob(imageData)
+            const byteArrays = []
 
-        const blob = new Blob(byteArrays, { type: "image/png" })
+            for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+              const slice = byteCharacters.slice(offset, offset + 512)
+
+              const byteNumbers = new Array(slice.length)
+              for (let i = 0; i < slice.length; i++) {
+                byteNumbers[i] = slice.charCodeAt(i)
+              }
+
+              const byteArray = new Uint8Array(byteNumbers)
+              byteArrays.push(byteArray)
+            }
+
+            blob = new Blob(byteArrays, { type: matches[1] || "image/png" })
+          } catch (error) {
+            addLog(`Error processing data URL for image ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+            continue
+          }
+        } else {
+          // It's a server URL, fetch the image
+          try {
+            addLog(`Fetching image ${index + 1} from server: ${imageUrl}`)
+            const response = await fetch(imageUrl)
+
+            if (!response.ok) {
+              addLog(`Failed to fetch image ${index + 1}: ${response.status} ${response.statusText}`)
+              continue
+            }
+
+            blob = await response.blob()
+            addLog(`Successfully fetched image ${index + 1} (${Math.round(blob.size / 1024)} KB)`)
+          } catch (error) {
+            addLog(`Error fetching image ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+            continue
+          }
+        }
 
         // Add to zip with a filename
         zip.file(`processed-image-${index + 1}.png`, blob)
-      })
+        addLog(`Added image ${index + 1} to zip file`)
+      }
 
       // Generate the zip file
+      addLog('Generating zip file...')
       const content = await zip.generateAsync({ type: "blob" })
+      addLog(`Zip file generated (${Math.round(content.size / 1024)} KB)`)
 
       // Create download link
       const link = document.createElement("a")
