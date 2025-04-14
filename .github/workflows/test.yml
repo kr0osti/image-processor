@@ -29,10 +29,33 @@ jobs:
       - name: Create uploads directory
         run: mkdir -p public/uploads && chmod -R 777 public/uploads
       
-      - name: Run tests
-        run: NODE_ENV=test-node pnpm test -- --passWithNoTests
+      - name: Run API tests
+        run: NODE_ENV=test-node pnpm test __tests__/api -- --passWithNoTests
         env:
           NEXT_PUBLIC_SITE_NAME: "NextJS Image Processor"
           NEXT_PUBLIC_SITE_DESCRIPTION: "A powerful web application for processing images"
           NEXT_PUBLIC_SITE_URL: "https://example.com"
           CLEANUP_API_KEY: "test-api-key-for-ci"
+          
+      - name: Run component tests
+        run: pnpm test __tests__/components -- --passWithNoTests
+        env:
+          NEXT_PUBLIC_SITE_NAME: "NextJS Image Processor"
+          NEXT_PUBLIC_SITE_DESCRIPTION: "A powerful web application for processing images"
+          NEXT_PUBLIC_SITE_URL: "https://example.com"
+          CLEANUP_API_KEY: "test-api-key-for-ci"
+          
+      - name: Run utility tests
+        run: NODE_ENV=test-node pnpm test __tests__/utils -- --passWithNoTests
+        env:
+          NEXT_PUBLIC_SITE_NAME: "NextJS Image Processor"
+          NEXT_PUBLIC_SITE_DESCRIPTION: "A powerful web application for processing images"
+          NEXT_PUBLIC_SITE_URL: "https://example.com"
+          CLEANUP_API_KEY: "test-api-key-for-ci"
+      
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7

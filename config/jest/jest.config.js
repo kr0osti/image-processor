@@ -7,12 +7,11 @@ const createJestConfig = nextJest({
 
 // Add any custom config to be passed to Jest
 const customJestConfig = {
-  // Disable setupFilesAfterEnv for now to avoid path issues
-  // setupFilesAfterEnv: [
-  //   process.env.NODE_ENV === 'test-node'
-  //     ? './config/jest/jest.node.setup.js'
-  //     : './config/jest/jest.setup.js',
-  // ],
+  setupFilesAfterEnv: [
+    process.env.NODE_ENV === 'test-node'
+      ? './__tests__/api/setup.js'
+      : './config/jest/jest.setup.js',
+  ],
   testEnvironment: 'jest-environment-jsdom',
   forceExit: true,
   testMatch: [
