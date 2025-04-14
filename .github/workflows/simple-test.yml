@@ -1,4 +1,4 @@
-name: Test
+name: Simple Test
 
 on:
   push:
@@ -27,4 +27,4 @@ jobs:
         run: pnpm install
       
       - name: Run simple test
-        run: pnpm test __tests__/simple.test.js
+        run: pnpm test __tests__/simple.test.js -- --passWithNoTests

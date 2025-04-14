@@ -1,8 +1,13 @@
 const nextJest = require('next/jest');
+const path = require('path');
+
+// Get the absolute path to the project root
+const projectRoot = path.resolve(__dirname, '../..');
+console.log('Project root:', projectRoot);
 
 const createJestConfig = nextJest({
   // Provide the path to your Next.js app to load next.config.js and .env files in your test environment
-  dir: './',
+  dir: projectRoot,
 });
 
 // Add any custom config to be passed to Jest
@@ -16,6 +21,7 @@ const customJestConfig = {
   //     ? './__tests__/api/setup.js'
   //     : './config/jest/jest.setup.js',
   // ],
+  rootDir: projectRoot,
   testEnvironment: 'jest-environment-jsdom',
   forceExit: true,
   testMatch: [
