@@ -2,7 +2,29 @@
  * @jest-environment node
  */
 
-import { NextResponse } from 'next/server';
+// Mock NextResponse
+class MockNextResponse {
+  constructor(body, init = {}) {
+    this.body = body;
+    this.status = init.status || 200;
+    this.headers = new Map(Object.entries(init.headers || {}));
+  }
+
+  json() {
+    return Promise.resolve(this.body);
+  }
+}
+
+// Mock next/server
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: jest.fn((data, options = {}) => {
+      return new MockNextResponse(data, options);
+    }),
+  },
+}));
+
+// Import real modules after mocking
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
@@ -27,13 +49,13 @@ import { GET } from '../../app/api/serve-image/route';
 describe('Serve Image API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Set up default mock implementations
     existsSync.mockReturnValue(true);
     readFile.mockResolvedValue(Buffer.from('test image data'));
     path.join.mockImplementation((...args) => args.join('/'));
     path.extname.mockReturnValue('.png');
-    
+
     // Mock process.cwd()
     jest.spyOn(process, 'cwd').mockReturnValue('/test/path');
   });

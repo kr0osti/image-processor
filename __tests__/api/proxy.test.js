@@ -1,4 +1,33 @@
-import { NextRequest } from 'next/server';
+// Mock NextRequest and NextResponse
+class MockNextRequest {
+  constructor(url) {
+    this.url = url;
+    this.nextUrl = new URL(url);
+  }
+}
+
+class MockNextResponse {
+  constructor(body, init = {}) {
+    this.body = body;
+    this.status = init.status || 200;
+    this.headers = new Map(Object.entries(init.headers || {}));
+  }
+
+  json() {
+    return Promise.resolve(this.body);
+  }
+}
+
+// Mock next/server
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: jest.fn((data, options = {}) => {
+      return new MockNextResponse(data, options);
+    }),
+  },
+  NextRequest: MockNextRequest,
+}));
+
 import { GET } from '../../app/api/proxy/route';
 
 // Mock the rate limiter
@@ -16,7 +45,7 @@ describe('Proxy API', () => {
 
   it('should return 400 if no URL is provided', async () => {
     // Create a mock request without URL parameter
-    const request = new NextRequest('http://localhost:3000/api/proxy');
+    const request = new MockNextRequest('http://localhost:3000/api/proxy');
 
     // Call the API handler
     const response = await GET(request);
@@ -43,14 +72,14 @@ describe('Proxy API', () => {
     global.fetch.mockResolvedValue(mockResponse);
 
     // Create a mock request with URL parameter
-    const request = new NextRequest('http://localhost:3000/api/proxy?url=https://example.com/image.jpg');
+    const request = new MockNextRequest('http://localhost:3000/api/proxy?url=https://example.com/image.jpg');
 
     // Call the API handler
     const response = await GET(request);
 
     // Verify the response
     expect(response.status).toBe(200);
-    
+
     // Verify that fetch was called with the correct URL and headers
     expect(global.fetch).toHaveBeenCalledWith('https://example.com/image.jpg', expect.objectContaining({
       headers: expect.objectContaining({
@@ -74,7 +103,7 @@ describe('Proxy API', () => {
     });
 
     // Create a mock request with URL parameter
-    const request = new NextRequest('http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg');
+    const request = new MockNextRequest('http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg');
 
     // Call the API handler
     const response = await GET(request);
