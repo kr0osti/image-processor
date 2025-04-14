@@ -2,14 +2,17 @@
  * @jest-environment node
  */
 
-// Mock the NextResponse
+// Import the API route
+import { GET } from '../../app/api/healthcheck/route';
+
+// Create mock functions
 const mockJson = jest.fn((data) => ({
   status: 200,
   headers: new Map(),
   json: async () => data,
 }));
 
-// Mock next/server
+// Mock next/server - must be after imports but before tests
 jest.mock('next/server', () => ({
   NextResponse: {
     json: mockJson,
@@ -21,9 +24,6 @@ jest.mock('next/server', () => ({
     }
   },
 }));
-
-// Import the API route after mocking
-import { GET } from '../../app/api/healthcheck/route';
 
 // Mock the rate limiter
 jest.mock('../../app/utils/rate-limit.js', () => ({

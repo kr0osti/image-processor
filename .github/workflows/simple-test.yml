@@ -30,11 +30,11 @@ jobs:
         run: pnpm test __tests__/simple.test.js
 
       - name: Run API tests
-        run: NODE_ENV=test-node pnpm test __tests__/api/healthcheck.test.js __tests__/api/cleanup.test.js
+        run: NODE_ENV=test-node pnpm test __tests__/api/healthcheck.test.js __tests__/api/cleanup.test.js --no-cache
         env:
           CLEANUP_API_KEY: "test-api-key-for-ci"
 
       - name: Run utility tests
-        run: NODE_ENV=test-node pnpm test __tests__/utils/cleanup.test.js __tests__/utils/rate-limit.test.js
+        run: NODE_ENV=test-node pnpm test __tests__/utils/cleanup.test.js __tests__/utils/rate-limit.test.js --no-cache
         env:
           CLEANUP_API_KEY: "test-api-key-for-ci"

@@ -2,23 +2,23 @@
  * @jest-environment node
  */
 
-// Mock the NextResponse
+// Import the API route
+import { GET } from '../../app/api/cleanup/route';
+import { cleanupOldUploads } from '../../app/utils/cleanup';
+
+// Create mock functions
 const mockJson = jest.fn((data, options = {}) => ({
   status: options.status || 200,
   headers: new Map(),
   json: async () => data,
 }));
 
-// Mock next/server
+// Mock next/server - must be after imports but before tests
 jest.mock('next/server', () => ({
   NextResponse: {
     json: mockJson,
   },
 }));
-
-// Import the API route after mocking
-import { GET } from '../../app/api/cleanup/route';
-import { cleanupOldUploads } from '../../app/utils/cleanup';
 
 // Mock the cleanup utility
 jest.mock('../../app/utils/cleanup', () => ({

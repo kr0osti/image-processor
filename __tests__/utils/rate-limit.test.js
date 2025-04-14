@@ -2,22 +2,22 @@
  * @jest-environment node
  */
 
-// Mock NextResponse
+// Import the module
+import { createRateLimiter } from '../../app/utils/rate-limit';
+
+// Create mock functions
 const mockJson = jest.fn((data, options = {}) => ({
   status: options.status || 200,
   headers: new Map(),
   json: async () => data,
 }));
 
-// Mock next/server
+// Mock next/server - must be after imports but before tests
 jest.mock('next/server', () => ({
   NextResponse: {
     json: mockJson,
   },
 }));
-
-// Import the module after mocking
-import { createRateLimiter } from '../../app/utils/rate-limit';
 
 describe('Rate Limiter Utility', () => {
   beforeEach(() => {
