@@ -29,6 +29,11 @@ jobs:
       - name: Run simple test
         run: pnpm test -- __tests__/simple.test.js --no-cache
 
+      - name: Create uploads directory for tests
+        run: |
+          mkdir -p public/uploads
+          chmod -R 777 public/uploads
+
       - name: Run API tests
         run: NODE_ENV=test-node pnpm test -- __tests__/api/healthcheck.test.js __tests__/api/cleanup.test.js --no-cache
         env:

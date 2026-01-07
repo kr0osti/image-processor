@@ -141,3 +141,32 @@ jobs:
           labels: ${{ steps.meta-cleanup.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Test the built images
+      - name: Test Docker image permissions
+        if: env.SHOULD_BUILD == 'true'
+        run: |
+          echo "Testing Docker image permissions..."
+          
+          # Create test uploads directory
+          mkdir -p test-uploads
+          chmod 755 test-uploads
+          
+          # Get the first tag from meta-app (tags are newline-separated)
+          IMAGE_TAG=$(echo "${{ steps.meta-app.outputs.tags }}" | head -n1)
+          echo "Testing image: $IMAGE_TAG"
+          
+          # Test that entrypoint script exists and works
+          echo "Testing entrypoint script..."
+          docker run --rm \
+            -v "$(pwd)/test-uploads:/app/public/uploads" \
+            "$IMAGE_TAG" \
+            sh -c "
+              test -f /entrypoint.sh && echo '✓ Entrypoint script exists' || (echo '✗ Entrypoint script missing' && exit 1)
+              command -v su-exec && echo '✓ su-exec installed' || (echo '✗ su-exec missing' && exit 1)
+              touch /app/public/uploads/.test-write && rm /app/public/uploads/.test-write && echo '✓ Write permissions working'
+            " || (echo "✗ Permission test failed" && exit 1)
+          
+          # Cleanup
+          rm -rf test-uploads
+          echo "✓ Docker image permission tests passed"
