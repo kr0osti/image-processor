@@ -71,8 +71,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Install curl for healthcheck
-RUN apk add --no-cache curl
+# Install curl for healthcheck and su-exec for user switching
+RUN apk add --no-cache curl su-exec
 
 # Create uploads directory with proper permissions
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public && chmod -R 777 /app/public/uploads
@@ -85,10 +85,13 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-USER nextjs
+# Copy and set up entrypoint script (must be root-owned to run as root initially)
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && chown root:root /entrypoint.sh
 
 EXPOSE 3000
 
 ENV PORT=3000
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "server.js"]

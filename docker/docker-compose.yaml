@@ -3,7 +3,6 @@ services:
     image: ghcr.io/kr0osti/image-processor/nextjs-app:${VERSION:-latest}
     container_name: nextjs-image-processor
     restart: unless-stopped
-    user: "1001:1001"
     ports:
       - "6060:3000"
     env_file:
