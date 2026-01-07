@@ -99,7 +99,7 @@ export async function POST(request) {
     // Handle JSON request (dataUrl)
     if (contentType.includes('application/json')) {
       const body = await request.json();
-      const { dataUrl } = body;
+      const { dataUrl, originalFilename } = body;
 
       if (!dataUrl) {
         // Clear the timeout since we're about to return
@@ -134,7 +134,19 @@ export async function POST(request) {
       const uploadsDir = await ensureUploadsDir();
       const mimeType = matches[1];
       const fileExt = mimeType.split('/')[1] || 'png';
-      const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
+      
+      // Generate filename based on original filename if provided
+      let filename;
+      if (originalFilename) {
+        // Sanitize the filename and append -processed before the extension
+        const sanitized = originalFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const nameWithoutExt = sanitized.replace(/\.[^/.]+$/, '');
+        filename = `${nameWithoutExt}-processed.${fileExt}`;
+      } else {
+        // Fallback to random filename if no original filename provided
+        filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
+      }
+      
       const filePath = path.join(uploadsDir, filename);
       console.log(`Attempting to save file to: ${filePath}`);
 

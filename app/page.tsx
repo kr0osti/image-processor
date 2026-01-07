@@ -67,6 +67,8 @@ export default function ImageProcessor() {
   const [minHeight, setMinHeight] = useState<number | undefined>(undefined)
   const [customSizeEnabled, setCustomSizeEnabled] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const [imageUrlToFilename, setImageUrlToFilename] = useState<Map<string, string>>(new Map())
 
   // Add this function to copy image URL to clipboard
   const copyImageUrl = (dataUrl: string) => {
@@ -197,6 +199,14 @@ export default function ImageProcessor() {
         setImageMetadata(metadata)
         setFetchedImages(result.imageUrls)
         setFilteredImages(result.imageUrls)
+
+        // Store filename mapping for fetched images
+        const newMapping = new Map<string, string>()
+        result.imageUrls.forEach((imgUrl, index) => {
+          const filename = metadata[index]?.filename || imgUrl.split("/").pop()?.split("?")[0] || `image-${index + 1}`
+          newMapping.set(imgUrl, filename)
+        })
+        setImageUrlToFilename(newMapping)
 
         // Load images to determine their sizes
         addLog("Loading images to determine sizes...")
@@ -427,6 +437,14 @@ export default function ImageProcessor() {
       // Process uploaded files
       const fileUrls = files.map((file) => URL.createObjectURL(file))
       addLog(`Created object URLs for ${fileUrls.length} files`)
+      
+      // Store filename mapping
+      const newMapping = new Map<string, string>()
+      files.forEach((file, index) => {
+        newMapping.set(fileUrls[index], file.name)
+      })
+      setImageUrlToFilename(newMapping)
+      
       setImageUrls(fileUrls)
     }
   }
@@ -435,6 +453,73 @@ export default function ImageProcessor() {
     if (fileInputRef && fileInputRef.current) {
       fileInputRef.current.click();
     }
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set dragging to false if we're actually leaving the drop zone
+    // (not just moving between child elements)
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const allFiles = Array.from(e.dataTransfer.files);
+    const imageFiles = allFiles.filter((file) => 
+      file.type.startsWith('image/')
+    );
+
+    if (imageFiles.length === 0) {
+      addLog('No image files found in dropped files');
+      toast.error('Please drop image files only');
+      return;
+    }
+
+    if (imageFiles.length < allFiles.length) {
+      const skippedCount = allFiles.length - imageFiles.length;
+      addLog(`Skipped ${skippedCount} non-image file(s)`);
+      toast.info(`Skipped ${skippedCount} non-image file(s)`);
+    }
+
+    setUploadedFiles(imageFiles);
+    setProcessedImages([]);
+    setLogs([]);
+
+    addLog(`Uploaded ${imageFiles.length} file(s) via drag and drop`);
+    imageFiles.forEach((file) => {
+      addLog(`File: ${file.name}, Size: ${(file.size / 1024).toFixed(2)} KB, Type: ${file.type}`);
+    });
+
+    // Process uploaded files
+    const fileUrls = imageFiles.map((file) => URL.createObjectURL(file));
+    addLog(`Created object URLs for ${fileUrls.length} files`);
+    
+    // Store filename mapping
+    const newMapping = new Map<string, string>()
+    imageFiles.forEach((file, index) => {
+      newMapping.set(fileUrls[index], file.name)
+    })
+    setImageUrlToFilename(newMapping)
+    
+    setImageUrls(fileUrls);
   }
 
   const resolveUrl = (url: string, base: string): string => {
@@ -505,9 +590,10 @@ export default function ImageProcessor() {
    * Includes timeout handling and error management
    *
    * @param {string} dataUrl - The data URL to convert
+   * @param {string} [originalFilename] - Optional original filename to use for the processed file
    * @returns {Promise<string|null>} A promise that resolves to the URL of the saved image, or null if an error occurred
    */
-  const convertDataUrlToRealUrl = async (dataUrl: string): Promise<string | null> => {
+  const convertDataUrlToRealUrl = async (dataUrl: string, originalFilename?: string): Promise<string | null> => {
     try {
       // Create an AbortController to handle timeouts
       const controller = new AbortController();
@@ -520,7 +606,7 @@ export default function ImageProcessor() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ dataUrl }),
+        body: JSON.stringify({ dataUrl, originalFilename }),
         signal: controller.signal
       });
 
@@ -580,8 +666,11 @@ export default function ImageProcessor() {
           const compressedImage = await compressImageDataUrl(processedImage)
           addLog(`Compressed image ${index + 1} from ${Math.round(processedImage.length / 1024)} KB to ${Math.round(compressedImage.length / 1024)} KB`)
 
+          // Get original filename if available
+          const originalFilename = imageUrlToFilename.get(imageUrl)
+
           // Convert data URL to real URL
-          const realUrl = await convertDataUrlToRealUrl(compressedImage)
+          const realUrl = await convertDataUrlToRealUrl(compressedImage, originalFilename)
           if (realUrl !== null) {
             processed.push(realUrl)
             addLog(`Successfully processed image ${index + 1}`)
@@ -836,14 +925,73 @@ export default function ImageProcessor() {
     }
   }
 
+  // Helper function to extract filename from processed image URL
+  const getFilenameFromUrl = (url: string, index: number): string => {
+    try {
+      // Handle absolute URLs by creating a URL object
+      let urlObj: URL
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        urlObj = new URL(url)
+      } else if (url.startsWith('/')) {
+        // Relative URL, construct full URL
+        urlObj = new URL(url, window.location.origin)
+      } else {
+        // Try to parse as-is
+        urlObj = new URL(url, window.location.origin)
+      }
+      
+      // If it's a server URL with query parameter
+      if (urlObj.pathname.includes('/api/serve-image') || url.includes('/api/serve-image?file=')) {
+        const filename = urlObj.searchParams.get('file')
+        if (filename) return filename
+      }
+      
+      // If it's a direct uploads URL
+      if (urlObj.pathname.includes('/uploads/') || url.includes('/uploads/')) {
+        const pathname = urlObj.pathname
+        const filename = pathname.split('/uploads/')[1]?.split('?')[0] || 
+                        url.split('/uploads/')[1]?.split('?')[0]
+        if (filename) return filename
+      }
+      
+      // If it's a data URL, we can't extract a filename, use default
+      if (url.startsWith('data:')) {
+        return `processed-image-${index}.png`
+      }
+      
+      // Try to extract from any URL path
+      const pathname = urlObj.pathname || url
+      const pathParts = pathname.split('/')
+      const lastPart = pathParts[pathParts.length - 1]?.split('?')[0]
+      if (lastPart && lastPart.includes('.')) {
+        return lastPart
+      }
+    } catch (error) {
+      console.error('Error extracting filename from URL:', error)
+      // Try simple string extraction as fallback
+      if (url.includes('/api/serve-image?file=')) {
+        const match = url.match(/[?&]file=([^&]+)/)
+        if (match && match[1]) return match[1]
+      }
+      if (url.includes('/uploads/')) {
+        const match = url.match(/\/uploads\/([^?]+)/)
+        if (match && match[1]) return match[1]
+      }
+    }
+    
+    // Fallback to default filename
+    return `processed-image-${index}.png`
+  }
+
   const downloadImage = (dataUrl: string, index: number) => {
     const link = document.createElement("a")
     link.href = dataUrl
-    link.download = `processed-image-${index}.png`
+    const filename = getFilenameFromUrl(dataUrl, index)
+    link.download = filename
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    addLog(`Downloaded image ${index}`)
+    addLog(`Downloaded image ${index}: ${filename}`)
   }
 
   const downloadAllImages = () => {
@@ -925,9 +1073,10 @@ export default function ImageProcessor() {
           }
         }
 
-        // Add to zip with a filename
-        zip.file(`processed-image-${index + 1}.png`, blob)
-        addLog(`Added image ${index + 1} to zip file`)
+        // Add to zip with the correct filename
+        const filename = getFilenameFromUrl(imageUrl, index + 1)
+        zip.file(filename, blob)
+        addLog(`Added image ${index + 1} to zip file: ${filename}`)
       }
 
       // Generate the zip file
@@ -1081,15 +1230,15 @@ export default function ImageProcessor() {
           <CardDescription>Download and proccess images to 1500x1500px with appropriate positioning</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="webpage">
+          <Tabs defaultValue="upload">
             <TabsList className="mb-4">
-              <TabsTrigger value="webpage">
-                <Globe className="mr-2 h-4 w-4" />
-                From Webpage
-              </TabsTrigger>
               <TabsTrigger value="upload">
                 <Upload className="mr-2 h-4 w-4" />
                 Upload Images
+              </TabsTrigger>
+              <TabsTrigger value="webpage">
+                <Globe className="mr-2 h-4 w-4" />
+                From Webpage
               </TabsTrigger>
             </TabsList>
 
@@ -1316,8 +1465,16 @@ export default function ImageProcessor() {
                 </Alert>
 
                 <div
-                  className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-12 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 cursor-pointer transition-colors ${
+                    isDragging 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-300 hover:bg-gray-50'
+                  }`}
                   onClick={triggerFileInput}
+                  onDragOver={handleDragOver}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                 >
                   <Upload className="h-8 w-8 mb-4 text-gray-400" />
                   <p className="text-sm text-gray-500 mb-1">Click to upload or drag and drop</p>
