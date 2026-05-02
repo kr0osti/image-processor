@@ -23,7 +23,8 @@ jest.mock('fs/promises', () => ({
 
 jest.mock('path', () => ({
   join: jest.fn(),
-  extname: jest.fn()
+  extname: jest.fn(),
+  basename: jest.fn()
 }));
 
 // Import the function to test after mocking
@@ -60,6 +61,7 @@ describe('Serve Image API', () => {
       const parts = filename.split('.');
       return parts.length > 1 ? `.${parts.pop()}` : '';
     });
+    path.basename.mockImplementation((filename) => filename.split('/').pop());
 
     fs.existsSync.mockReturnValue(true);
     fsPromises.readFile.mockResolvedValue(Buffer.from('test image data'));

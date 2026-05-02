@@ -34,7 +34,12 @@ export async function GET(request) {
     const apiKey = url.searchParams.get('key');
 
     // Check if API key is provided and valid (you should use an environment variable for this)
-    const validApiKey = process.env.CLEANUP_API_KEY || 'change-this-to-a-secure-key';
+    const validApiKey = process.env.CLEANUP_API_KEY;
+
+    if (!validApiKey) {
+      console.error('CRITICAL: CLEANUP_API_KEY environment variable is not set');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
 
     if (!apiKey || apiKey !== validApiKey) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -24,7 +24,7 @@ describe('Cleanup Utility', () => {
     jest.clearAllMocks();
 
     // Set up default mock implementations
-    require('fs').existsSync.mockReturnValue(true);
+    require('fs').existsSync.mockImplementation(() => true);
     require('fs/promises').readdir.mockResolvedValue(['file1.jpg', 'file2.png', 'file3.webp']);
 
     // Mock process.cwd()
@@ -33,7 +33,7 @@ describe('Cleanup Utility', () => {
 
   it('should skip cleanup if uploads directory does not exist', async () => {
     // Mock existsSync to return false
-    require('fs').existsSync.mockReturnValue(false);
+    require('fs').existsSync.mockImplementation(() => false);
 
     const result = await cleanupOldUploads();
 
@@ -53,11 +53,11 @@ describe('Cleanup Utility', () => {
     require('fs/promises').stat.mockImplementation((filePath) => {
       if (filePath.includes('file1.jpg') || filePath.includes('file3.webp')) {
         return Promise.resolve({
-          mtime: oldFileTime,
+          mtimeMs: oldFileTime.getTime(),
         });
       } else {
         return Promise.resolve({
-          mtime: newFileTime,
+          mtimeMs: newFileTime.getTime(),
         });
       }
     });
@@ -78,7 +78,7 @@ describe('Cleanup Utility', () => {
   it('should handle errors during file deletion', async () => {
     // Mock file stats to make all files old
     require('fs/promises').stat.mockResolvedValue({
-      mtime: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours old
+      mtimeMs: new Date(Date.now() - 2 * 60 * 60 * 1000).getTime(), // 2 hours old
     });
 
     // Mock unlink to throw an error for one file
@@ -100,7 +100,7 @@ describe('Cleanup Utility', () => {
   it('should not delete files newer than the specified age', async () => {
     // Mock all files to be new
     require('fs/promises').stat.mockResolvedValue({
-      mtime: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes old
+      mtimeMs: new Date(Date.now() - 30 * 60 * 1000).getTime(), // 30 minutes old
     });
 
     // Run cleanup with 1 hour max age
