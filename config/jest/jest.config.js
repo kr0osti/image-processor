@@ -16,11 +16,7 @@ console.log('Current directory:', process.cwd());
 
 const customJestConfig = {
   // Disable setupFilesAfterEnv for now to avoid path issues
-  // setupFilesAfterEnv: [
-  //   process.env.NODE_ENV === 'test-node'
-  //     ? './__tests__/api/setup.js'
-  //     : './config/jest/jest.setup.js',
-  // ],
+
   rootDir: projectRoot,
   testEnvironment: 'jest-environment-jsdom',
   forceExit: true,
@@ -33,7 +29,11 @@ const customJestConfig = {
     '^@/(.*)$': '<rootDir>/$1',
   },
   // Add more setup options before each test is run
-  // setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: [
+    process.env.NODE_ENV === "test-node"
+      ? "<rootDir>/__tests__/api/setup.js"
+      : "<rootDir>/config/jest/jest.setup.js"
+  ],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/', '<rootDir>/e2e/'],
   transform: {
     // Use babel-jest to transpile tests with the next/babel preset
