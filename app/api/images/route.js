@@ -227,11 +227,13 @@ export async function POST(request) {
 
       if (files && files.length > 0) {
         console.log(`Processing ${files.length} uploaded files`);
+        // Ensure the uploads directory exists once before processing all files
+        const uploadsDir = await ensureUploadsDir();
+
         // Process uploaded files
         for (const file of files) {
           if (file) {
             // Save the file to the uploads directory
-            const uploadsDir = await ensureUploadsDir();
             const fileExt = file.name.split('.').pop() || 'png';
             const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
             const filePath = path.join(uploadsDir, filename);
