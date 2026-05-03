@@ -230,26 +230,29 @@ export async function POST(request) {
         // Ensure the uploads directory exists once before processing all files
         const uploadsDir = await ensureUploadsDir();
 
-        // Process uploaded files
-        for (const file of files) {
-          if (file) {
-            // Save the file to the uploads directory
-            const fileExt = file.name.split('.').pop() || 'png';
-            const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
-            const filePath = path.join(uploadsDir, filename);
-            const publicUrl = `/uploads/${filename}`;
+        // Process uploaded files concurrently
+        const filePromises = files.map(async (file) => {
+          if (!file) return null;
 
-            // Get file data as ArrayBuffer and save it
-            const fileData = await file.arrayBuffer();
-            await writeFile(filePath, Buffer.from(fileData));
+          // Save the file to the uploads directory
+          const fileExt = file.name.split('.').pop() || 'png';
+          const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
+          const filePath = path.join(uploadsDir, filename);
+          const publicUrl = `/uploads/${filename}`;
 
-            processedImages.push({
-              originalName: file.name,
-              processedUrl: publicUrl,
-              success: true
-            });
-          }
-        }
+          // Get file data as ArrayBuffer and save it
+          const fileData = await file.arrayBuffer();
+          await writeFile(filePath, Buffer.from(fileData));
+
+          return {
+            originalName: file.name,
+            processedUrl: publicUrl,
+            success: true
+          };
+        });
+
+        const results = await Promise.all(filePromises);
+        processedImages.push(...results.filter(Boolean));
       }
 
       if (webUrl) {
