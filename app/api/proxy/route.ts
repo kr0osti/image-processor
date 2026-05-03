@@ -54,11 +54,25 @@ export async function GET(request: NextRequest) {
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const buffer = await response.arrayBuffer();
 
+    // Security: Restrict CORS to prevent unauthorized cross-origin access.
+    // We only allow our own application to access this proxy.
+    const origin = request.headers.get('origin');
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    let allowedOrigin = '';
+
+    if (siteUrl && origin === new URL(siteUrl).origin) {
+      allowedOrigin = origin;
+    } else if (!origin) {
+      // Allow requests without Origin header (e.g., direct browser access)
+      allowedOrigin = '';
+    }
+
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400',
-        'Access-Control-Allow-Origin': '*'
+        'Vary': 'Origin',
+        ...(allowedOrigin && { 'Access-Control-Allow-Origin': allowedOrigin })
       }
     });
   } catch (error) {
