@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRateLimiter } from '../../utils/rate-limit.js';
+import { isSafeUrl } from '@/lib/ssrf';
 
 // Create a rate limiter for the proxy endpoint
 // Allow 500 requests per minute per IP address
@@ -32,6 +33,11 @@ export async function GET(request: NextRequest) {
 
   if (!url) {
     return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 });
+  }
+
+  // Security: Validate the URL to prevent SSRF
+  if (!(await isSafeUrl(url))) {
+    return NextResponse.json({ error: 'The provided URL is not allowed for security reasons.' }, { status: 403 });
   }
 
   try {

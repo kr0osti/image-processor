@@ -12,3 +12,8 @@
 **Vulnerability:** The `app/api/proxy/route.ts` used `Access-Control-Allow-Origin: '*'`, allowing any website to make cross-origin requests to this endpoint.
 **Learning:** Using a wildcard for CORS origin can expose sensitive endpoints to unauthorized cross-origin access and potential data leakage.
 **Prevention:** Restrict `Access-Control-Allow-Origin` to specific, trusted origins (e.g., using `process.env.NEXT_PUBLIC_SITE_URL`) or omit the header entirely if not needed.
+
+## 2026-05-03 - [SSRF in Image Fetching and Proxy]
+**Vulnerability:** The `fetchImagesFromUrl` action and `/api/proxy` endpoint fetched user-provided URLs without validating the target host, allowing potential access to internal services and private network resources.
+**Learning:** Server-side fetching of user-provided URLs is a high-risk operation. Validating the hostname string is insufficient as attackers can use DNS rebinding to point a public domain to a private IP address.
+**Prevention:** Implement a robust URL validation utility that checks for safe protocols, blocks private/reserved IP ranges, and performs DNS resolution to verify the actual IP address being accessed.
