@@ -13,7 +13,6 @@ export async function cleanupOldUploads(maxAgeMs = 60 * 60 * 1000) { // Default:
   
   // Check if uploads directory exists
   if (!existsSync(uploadsDir)) {
-    console.log('Uploads directory does not exist, nothing to clean up');
     return { deleted: 0, errors: 0 };
   }
   
@@ -26,7 +25,6 @@ export async function cleanupOldUploads(maxAgeMs = 60 * 60 * 1000) { // Default:
     // Skip .gitkeep file if it exists
     const filesToProcess = files.filter(file => file !== '.gitkeep');
     
-    console.log(`Checking ${filesToProcess.length} files for cleanup...`);
     
     for (const file of filesToProcess) {
       const filePath = path.join(uploadsDir, file);
@@ -39,7 +37,6 @@ export async function cleanupOldUploads(maxAgeMs = 60 * 60 * 1000) { // Default:
         if (fileAge > maxAgeMs) {
           await unlink(filePath);
           deleted++;
-          console.log(`Deleted old file: ${file} (age: ${Math.round(fileAge / 1000 / 60)} minutes)`);
         }
       } catch (err) {
         console.error(`Error processing file ${file}:`, err);
@@ -47,7 +44,6 @@ export async function cleanupOldUploads(maxAgeMs = 60 * 60 * 1000) { // Default:
       }
     }
     
-    console.log(`Cleanup complete. Deleted ${deleted} files, encountered ${errors} errors.`);
     return { deleted, errors };
   } catch (error) {
     console.error('Error cleaning up old uploads:', error);

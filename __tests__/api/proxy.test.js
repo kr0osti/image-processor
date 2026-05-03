@@ -6,6 +6,7 @@ class MockNextRequest2 {
   constructor(url) {
     this.url = url;
     this.nextUrl = new URL(url);
+    this.headers = new Map();
   }
 }
 
@@ -24,7 +25,13 @@ class MockNextResponse {
 // Mock next/server
 jest.mock('next/server', () => {
   return {
-    NextRequest: class MockNextRequest { constructor(url) { this.url = url; this.nextUrl = new URL(url); } },
+    NextRequest: class MockNextRequest {
+    constructor(url, options = {}) {
+      this.url = url;
+      this.nextUrl = new URL(url);
+      this.headers = new global.Headers(options.headers || {});
+    }
+  },
     NextResponse: class MockNextResponse {
       constructor(body, init = {}) {
         this.body = body;
@@ -52,7 +59,7 @@ describe('Proxy API', () => {
 
   it('should return 400 if no URL is provided', async () => {
     // Create a mock request without URL parameter
-    const request = { url: 'http://localhost:3000/api/proxy', nextUrl: new URL('http://localhost:3000/api/proxy') };
+    const request = { url: 'http://localhost:3000/api/proxy', nextUrl: new URL('http://localhost:3000/api/proxy') , headers: new Map() };
 
     // Call the API handler
     const response = await GET(request);
@@ -79,7 +86,7 @@ describe('Proxy API', () => {
     global.fetch.mockResolvedValue(mockResponse);
 
     // Create a mock request with URL parameter
-    const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/image.jpg', nextUrl: { searchParams: new URL('http://localhost:3000/api/proxy?url=https://example.com/image.jpg').searchParams } };
+    const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/image.jpg', nextUrl: { searchParams: new URL('http://localhost:3000/api/proxy?url=https://example.com/image.jpg').searchParams }, headers: new Map() };
 
     // Call the API handler
     const response = await GET(request);
@@ -110,7 +117,7 @@ describe('Proxy API', () => {
     });
 
     // Create a mock request with URL parameter
-    const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg', nextUrl: { searchParams: new URL('http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg').searchParams } };
+    const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg', nextUrl: { searchParams: new URL('http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg').searchParams }, headers: new Map() };
 
     // Call the API handler
     const response = await GET(request);

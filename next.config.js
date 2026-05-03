@@ -4,9 +4,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Increase API limits for handling large images
-  experimental: {
-    serverComponentsExternalPackages: ['sharp'],
-  },
+  serverExternalPackages: ['sharp'],
   images: {
     remotePatterns: [
       {
