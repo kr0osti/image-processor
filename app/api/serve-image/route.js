@@ -13,12 +13,15 @@ export async function GET(request) {
   try {
     // Get the image filename from the URL
     const url = new URL(request.url);
-    const filename = url.searchParams.get('file');
+    const rawFilename = url.searchParams.get('file');
     
-    if (!filename) {
+    if (!rawFilename) {
       return NextResponse.json({ error: 'No filename provided' }, { status: 400 });
     }
     
+    // Sanitize filename to prevent path traversal
+    const filename = path.basename(rawFilename);
+
     // Construct the file path
     const filePath = path.join(process.cwd(), 'public', 'uploads', filename);
     

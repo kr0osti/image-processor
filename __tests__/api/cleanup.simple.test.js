@@ -36,7 +36,7 @@ describe('Cleanup API', () => {
 
   it('should return 401 if no API key is provided', async () => {
     // Create a request without an API key
-    const req = new NextRequest('http://localhost:3000/api/cleanup');
+    const req = { url: 'http://localhost:3000/api/cleanup', nextUrl: new URL('http://localhost:3000/api/cleanup') };
     
     // Call the API
     const response = await GET(req);

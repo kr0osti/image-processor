@@ -111,6 +111,7 @@ jobs:
           context: .
           file: ./docker/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta-app.outputs.tags }}
           labels: ${{ steps.meta-app.outputs.labels }}
           cache-from: type=gha
@@ -137,6 +138,7 @@ jobs:
           context: .
           file: ./docker/Dockerfile.cleanup
           push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta-cleanup.outputs.tags }}
           labels: ${{ steps.meta-cleanup.outputs.labels }}
           cache-from: type=gha

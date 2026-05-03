@@ -26,13 +26,10 @@ jest.mock('fs', () => ({
 
 // Helper to create a mock request
 const createMockRequest = (body, contentType = 'application/json') => {
-  return new NextRequest('http://localhost:3000/api/images', {
-    method: 'POST',
-    headers: {
-      'Content-Type': contentType,
-    },
-    body: JSON.stringify(body),
-  });
+  return {
+    headers: { get: (name) => name.toLowerCase() === 'content-type' ? contentType : null },
+    json: async () => body,
+  };
 };
 
 describe('Images API', () => {
