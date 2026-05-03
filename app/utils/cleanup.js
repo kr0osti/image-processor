@@ -25,7 +25,6 @@ export async function cleanupOldUploads(maxAgeMs = 60 * 60 * 1000) { // Default:
     // Skip .gitkeep file if it exists
     const filesToProcess = files.filter(file => file !== '.gitkeep');
     
-    
     for (const file of filesToProcess) {
       const filePath = path.join(uploadsDir, file);
       

@@ -211,27 +211,33 @@ export async function POST(request) {
       }
 
       if (files && files.length > 0) {
-        // Process uploaded files
-        for (const file of files) {
-          if (file) {
-            // Save the file to the uploads directory
-            const uploadsDir = await ensureUploadsDir();
-            const fileExt = file.name.split('.').pop() || 'png';
-            const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
-            const filePath = path.join(uploadsDir, filename);
-            const publicUrl = `/uploads/${filename}`;
+        console.log(`Processing ${files.length} uploaded files`);
+        // Ensure the uploads directory exists once before processing all files
+        const uploadsDir = await ensureUploadsDir();
 
-            // Get file data as ArrayBuffer and save it
-            const fileData = await file.arrayBuffer();
-            await writeFile(filePath, Buffer.from(fileData));
+        // Process uploaded files concurrently
+        const filePromises = files.map(async (file) => {
+          if (!file) return null;
 
-            processedImages.push({
-              originalName: file.name,
-              processedUrl: publicUrl,
-              success: true
-            });
-          }
-        }
+          // Save the file to the uploads directory
+          const fileExt = file.name.split('.').pop() || 'png';
+          const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
+          const filePath = path.join(uploadsDir, filename);
+          const publicUrl = `/uploads/${filename}`;
+
+          // Get file data as ArrayBuffer and save it
+          const fileData = await file.arrayBuffer();
+          await writeFile(filePath, Buffer.from(fileData));
+
+          return {
+            originalName: file.name,
+            processedUrl: publicUrl,
+            success: true
+          };
+        });
+
+        const results = await Promise.all(filePromises);
+        processedImages.push(...results.filter(Boolean));
       }
 
       if (webUrl) {
