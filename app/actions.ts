@@ -1,6 +1,7 @@
 "use server"
 
 import * as cheerio from "cheerio"
+import { isSafeUrl } from "@/lib/ssrf"
 
 // Add this interface to define image metadata
 export interface ImageMetadata {
@@ -25,6 +26,12 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
 
   try {
     logs.push(`Starting to fetch URL: ${url}`)
+
+    // Security: Validate the URL to prevent SSRF
+    if (!(await isSafeUrl(url))) {
+      logs.push(`Security error: Blocked potentially unsafe URL: ${url}`)
+      return { error: "The provided URL is not allowed for security reasons.", logs }
+    }
 
     // Determine base URL for resolving relative paths
     let baseUrl: string
