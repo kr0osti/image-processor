@@ -7,3 +7,8 @@
 **Vulnerability:** The `app/api/cleanup/route.js` had a hardcoded default secret (`change-this-to-a-secure-key`) that would allow an attacker to bypass authentication if `process.env.CLEANUP_API_KEY` was missing from the server environment.
 **Learning:** Providing a "fallback" string for secrets creates a backdoor if deployment environments fail to set the environment variable. This allows the endpoint to become inadvertently public.
 **Prevention:** Rather than using a fallback secret, an endpoint should throw an error (e.g. 500) or refuse to start if a required environment variable is not defined.
+
+## 2024-05-24 - [Overly Permissive CORS in Proxy Route]
+**Vulnerability:** The `app/api/proxy/route.ts` used `Access-Control-Allow-Origin: '*'`, allowing any website to make cross-origin requests to this endpoint.
+**Learning:** Using a wildcard for CORS origin can expose sensitive endpoints to unauthorized cross-origin access and potential data leakage.
+**Prevention:** Restrict `Access-Control-Allow-Origin` to specific, trusted origins (e.g., using `process.env.NEXT_PUBLIC_SITE_URL`) or omit the header entirely if not needed.
