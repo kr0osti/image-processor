@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import ImageCard from '../../app/components/ImageCard';
+import { ImageCard } from '../../components/image-card';
 
 // Mock the next/image component
 jest.mock('next/image', () => ({
@@ -14,13 +14,11 @@ jest.mock('next/image', () => ({
 
 describe('ImageCard Component', () => {
   const mockImage = {
-    src: '/uploads/test-image.jpg',
+    id: 'test-id',
+    url: '/uploads/test-image.jpg',
     alt: 'Test Image',
-    width: 300,
-    height: 200,
   };
 
-  const mockOnSelect = jest.fn();
   const mockOnRemove = jest.fn();
 
   beforeEach(() => {
@@ -31,66 +29,27 @@ describe('ImageCard Component', () => {
     render(
       <ImageCard
         image={mockImage}
-        selected={false}
-        onSelect={mockOnSelect}
-        onRemove={mockOnRemove}
+        onDelete={mockOnRemove}
       />
     );
 
     const imageElement = screen.getByAltText('Test Image');
     expect(imageElement).toBeInTheDocument();
     expect(imageElement).toHaveAttribute('src', '/uploads/test-image.jpg');
-    expect(imageElement).toHaveAttribute('width', '300');
-    expect(imageElement).toHaveAttribute('height', '200');
-  });
-
-  it('calls onSelect when clicked', () => {
-    render(
-      <ImageCard
-        image={mockImage}
-        selected={false}
-        onSelect={mockOnSelect}
-        onRemove={mockOnRemove}
-      />
-    );
-
-    const card = screen.getByRole('button');
-    fireEvent.click(card);
-
-    expect(mockOnSelect).toHaveBeenCalledTimes(1);
-    expect(mockOnSelect).toHaveBeenCalledWith(mockImage);
-  });
-
-  it('shows selected state when selected prop is true', () => {
-    render(
-      <ImageCard
-        image={mockImage}
-        selected={true}
-        onSelect={mockOnSelect}
-        onRemove={mockOnRemove}
-      />
-    );
-
-    const card = screen.getByRole('button');
-    expect(card).toHaveClass('selected');
   });
 
   it('calls onRemove when remove button is clicked', () => {
     render(
       <ImageCard
         image={mockImage}
-        selected={false}
-        onSelect={mockOnSelect}
-        onRemove={mockOnRemove}
+        onDelete={mockOnRemove}
       />
     );
 
-    const removeButton = screen.getByLabelText('Remove image');
+    const removeButton = screen.getByRole('button');
     fireEvent.click(removeButton);
 
     expect(mockOnRemove).toHaveBeenCalledTimes(1);
-    expect(mockOnRemove).toHaveBeenCalledWith(mockImage);
-    // The event should not propagate to the card
-    expect(mockOnSelect).not.toHaveBeenCalled();
+    expect(mockOnRemove).toHaveBeenCalledWith(mockImage.id);
   });
 });

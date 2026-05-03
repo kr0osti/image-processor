@@ -34,6 +34,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 });
   }
 
+  // Validate URL to prevent SSRF
+  try {
+    const parsedUrl = new URL(url);
+    // Only allow HTTP and HTTPS protocols
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return NextResponse.json({ error: 'Invalid URL protocol' }, { status: 400 });
+    }
+  } catch (error) {
+    return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
+  }
+
   try {
     const response = await fetch(url, {
       headers: {

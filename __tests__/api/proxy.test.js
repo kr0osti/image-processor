@@ -2,7 +2,7 @@
 import { GET } from '../../app/api/proxy/route';
 
 // Mock NextRequest and NextResponse
-class MockNextRequest {
+class MockNextRequest2 {
   constructor(url) {
     this.url = url;
     this.nextUrl = new URL(url);
@@ -22,14 +22,20 @@ class MockNextResponse {
 }
 
 // Mock next/server
-jest.mock('next/server', () => ({
-  NextResponse: {
-    json: jest.fn((data, options = {}) => {
-      return new MockNextResponse(data, options);
-    }),
-  },
-  NextRequest: MockNextRequest,
-}));
+jest.mock('next/server', () => {
+  return {
+    NextRequest: class MockNextRequest { constructor(url) { this.url = url; this.nextUrl = new URL(url); } },
+    NextResponse: class MockNextResponse {
+      constructor(body, init = {}) {
+        this.body = body;
+        this.status = init.status || 200;
+        this.headers = new Map(Object.entries(init.headers || {}));
+      }
+      json() { return Promise.resolve(this.body); }
+      static json(data, options = {}) { return new MockNextResponse(data, options); }
+    }
+  };
+});
 
 // Mock the rate limiter
 jest.mock('../../app/utils/rate-limit.js', () => ({
@@ -46,7 +52,7 @@ describe('Proxy API', () => {
 
   it('should return 400 if no URL is provided', async () => {
     // Create a mock request without URL parameter
-    const request = new MockNextRequest('http://localhost:3000/api/proxy');
+    const request = { url: 'http://localhost:3000/api/proxy', nextUrl: new URL('http://localhost:3000/api/proxy') };
 
     // Call the API handler
     const response = await GET(request);
@@ -61,6 +67,38 @@ describe('Proxy API', () => {
     expect(data).toHaveProperty('error', 'URL parameter is required');
   });
 
+  it('should return 400 if an invalid URL format is provided', async () => {
+    const request = { url: 'http://localhost:3000/api/proxy?url=not-a-url', nextUrl: { searchParams: new URLSearchParams('url=not-a-url') } };
+
+    // Call the API handler
+    const response = await GET(request);
+
+    // Verify the response
+    expect(response.status).toBe(400);
+
+    // Parse the response body
+    const data = await response.json();
+
+    // Verify the response data
+    expect(data).toHaveProperty('error', 'Invalid URL format');
+  });
+
+  it('should return 400 if a non-HTTP/HTTPS protocol is provided (SSRF prevention)', async () => {
+    const request = { url: 'http://localhost:3000/api/proxy?url=file:///etc/passwd', nextUrl: { searchParams: new URLSearchParams('url=file:///etc/passwd') } };
+
+    // Call the API handler
+    const response = await GET(request);
+
+    // Verify the response
+    expect(response.status).toBe(400);
+
+    // Parse the response body
+    const data = await response.json();
+
+    // Verify the response data
+    expect(data).toHaveProperty('error', 'Invalid URL protocol');
+  });
+
   it('should fetch and return the image from the provided URL', async () => {
     // Mock successful fetch response
     const mockImageBuffer = Buffer.from('test image data');
@@ -73,7 +111,7 @@ describe('Proxy API', () => {
     global.fetch.mockResolvedValue(mockResponse);
 
     // Create a mock request with URL parameter
-    const request = new MockNextRequest('http://localhost:3000/api/proxy?url=https://example.com/image.jpg');
+    const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/image.jpg', nextUrl: { searchParams: new URL('http://localhost:3000/api/proxy?url=https://example.com/image.jpg').searchParams } };
 
     // Call the API handler
     const response = await GET(request);
@@ -104,7 +142,7 @@ describe('Proxy API', () => {
     });
 
     // Create a mock request with URL parameter
-    const request = new MockNextRequest('http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg');
+    const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg', nextUrl: { searchParams: new URL('http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg').searchParams } };
 
     // Call the API handler
     const response = await GET(request);

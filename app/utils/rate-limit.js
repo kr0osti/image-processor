@@ -109,3 +109,5 @@ export function createRateLimiter(config) {
     return null;
   };
 }
+
+export function clearStoreForTesting() { Object.keys(store).forEach(k => delete store[k]); }
