@@ -21,7 +21,7 @@ services:
       - NEXT_PUBLIC_SITE_THEME_COLOR=${NEXT_PUBLIC_SITE_THEME_COLOR:-#000000}
       - NEXT_PUBLIC_SITE_BACKGROUND_COLOR=${NEXT_PUBLIC_SITE_BACKGROUND_COLOR:-#ffffff}
       - CLEANUP_API_KEY=${CLEANUP_API_KEY:-dev-api-key}
-      - CLEANUP_CRON_SCHEDULE=${CLEANUP_CRON_SCHEDULE:-"* * * * *"}
+      - CLEANUP_CRON_SCHEDULE=${CLEANUP_CRON_SCHEDULE:-"*/30 * * * *"}
     volumes:
       - ../app:/app/app
       - ../components:/app/components

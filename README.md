@@ -61,7 +61,7 @@ Customize the application by setting these environment variables in your `.env` 
 | `NEXT_PUBLIC_SITE_THEME_COLOR` | Theme color (hex) | #000000 |
 | `NEXT_PUBLIC_SITE_BACKGROUND_COLOR` | Background color (hex) | #ffffff |
 | `CLEANUP_API_KEY` | API key for the cleanup endpoint | change-this-to-a-secure-key |
-| `CLEANUP_CRON_SCHEDULE` | Cron schedule for the cleanup job | * * * * * |
+| `CLEANUP_CRON_SCHEDULE` | Cron schedule for the cleanup job | */30 * * * * |
 | `NEXT_PUBLIC_DEBUG` | Enable debug logging | false |
 
 ## 🏗️ Architecture

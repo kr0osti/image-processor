@@ -10,8 +10,8 @@ export function initCronJobs() {
   }
 
   console.log('Initializing cleanup cron job...');
-  // Use environment variable for schedule, default to every minute
-  const schedule = process.env.CLEANUP_CRON_SCHEDULE || '* * * * *';
+  // Use environment variable for schedule, default to every 30 minutes
+  const schedule = process.env.CLEANUP_CRON_SCHEDULE || '*/30 * * * *';
   console.log(`Cron schedule configured as: ${schedule}`);
 
   task = cron.schedule(schedule, async () => {
