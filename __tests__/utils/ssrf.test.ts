@@ -1,9 +1,12 @@
-import { isSafeUrl } from '../../lib/ssrf';
+import { isSafeUrl, safeFetch } from '../../lib/ssrf';
 import dns from 'dns';
 
 jest.mock('dns', () => ({
   lookup: jest.fn(),
 }));
+
+// Mock global fetch
+global.fetch = jest.fn();
 
 describe('isSafeUrl', () => {
   const originalEnv = process.env;
@@ -73,5 +76,71 @@ describe('isSafeUrl', () => {
     it('should still block non-http/https protocols', async () => {
       expect(await isSafeUrl('file:///etc/passwd')).toBe(false);
     });
+  });
+});
+
+describe('safeFetch', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should fetch safe URLs', async () => {
+    (dns.lookup as unknown as jest.Mock).mockImplementation((hostname, options, callback) => {
+      callback(null, [{ address: '93.184.216.34' }]);
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      status: 200,
+      ok: true
+    });
+
+    const response = await safeFetch('https://example.com');
+    expect(response.status).toBe(200);
+    expect(global.fetch).toHaveBeenCalledWith('https://example.com', expect.objectContaining({ redirect: 'manual' }));
+  });
+
+  it('should block unsafe initial URLs', async () => {
+    (dns.lookup as unknown as jest.Mock).mockImplementation((hostname, options, callback) => {
+      callback(null, [{ address: '127.0.0.1' }]);
+    });
+
+    await expect(safeFetch('http://127.0.0.1')).rejects.toThrow('SSRF Blocked');
+  });
+
+  it('should follow safe redirects', async () => {
+    (dns.lookup as unknown as jest.Mock).mockImplementation((hostname, options, callback) => {
+      callback(null, [{ address: '93.184.216.34' }]);
+    });
+
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        status: 301,
+        headers: new Map([['location', 'https://example.com/new']])
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true
+      });
+
+    const response = await safeFetch('https://example.com/old');
+    expect(response.status).toBe(200);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenNthCalledWith(2, 'https://example.com/new', expect.any(Object));
+  });
+
+  it('should block unsafe redirects', async () => {
+    (dns.lookup as unknown as jest.Mock).mockImplementation((hostname, options, callback) => {
+      if (hostname === 'example.com') {
+        callback(null, [{ address: '93.184.216.34' }]);
+      } else {
+        callback(null, [{ address: '127.0.0.1' }]);
+      }
+    });
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      status: 301,
+      headers: new Map([['location', 'http://localhost/secret']])
+    });
+
+    await expect(safeFetch('https://example.com/redirect-to-internal')).rejects.toThrow('SSRF Blocked: Unsafe URL: http://localhost/secret');
   });
 });

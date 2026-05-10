@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRateLimiter } from '../../utils/rate-limit.js';
-import { isSafeUrl } from '@/lib/ssrf';
+import { isSafeUrl, safeFetch } from '@/lib/ssrf';
 
 // Create a rate limiter for the proxy endpoint
 // Allow 500 requests per minute per IP address
@@ -35,13 +35,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'URL parameter is required' }, { status: 400 });
   }
 
-  // Security: Validate the URL to prevent SSRF
-  if (!(await isSafeUrl(url))) {
-    return NextResponse.json({ error: 'The provided URL is not allowed for security reasons.' }, { status: 403 });
-  }
-
   try {
-    const response = await fetch(url, {
+    // Security: Use safeFetch to prevent SSRF and validate redirect chain
+    const response = await safeFetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -82,6 +78,9 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (error) {
+    if (error instanceof Error && error.message.includes('SSRF Blocked')) {
+      return NextResponse.json({ error: 'The provided URL is not allowed for security reasons.' }, { status: 403 });
+    }
     console.error('Proxy error:', error);
     return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
   }

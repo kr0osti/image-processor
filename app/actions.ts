@@ -1,7 +1,7 @@
 "use server"
 
 import * as cheerio from "cheerio"
-import { isSafeUrl } from "@/lib/ssrf"
+import { isSafeUrl, safeFetch } from "@/lib/ssrf"
 
 // Add this interface to define image metadata
 export interface ImageMetadata {
@@ -27,12 +27,6 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
   try {
     logs.push(`Starting to fetch URL: ${url}`)
 
-    // Security: Validate the URL to prevent SSRF
-    if (!(await isSafeUrl(url))) {
-      logs.push(`Security error: Blocked potentially unsafe URL: ${url}`)
-      return { error: "The provided URL is not allowed for security reasons.", logs }
-    }
-
     // Determine base URL for resolving relative paths
     let baseUrl: string
     try {
@@ -44,7 +38,8 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
     }
 
     // Fetch the HTML content from the URL
-    const response = await fetch(url, {
+    // Security: Use safeFetch to prevent SSRF and validate redirect chain
+    const response = await safeFetch(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -160,6 +155,10 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
     logs.push(`Found ${imageUrls.length} unique images`)
     return { imageUrls, imageMetadata, logs }
   } catch (error) {
+    if (error instanceof Error && error.message.includes('SSRF Blocked')) {
+      logs.push(`Security error: ${error.message}`)
+      return { error: "The provided URL is not allowed for security reasons.", logs }
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     logs.push(`Error in fetchImagesFromUrl: ${errorMessage}`)
     console.error("Error in fetchImagesFromUrl:", error)

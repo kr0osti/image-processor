@@ -103,3 +103,36 @@ export async function isSafeUrl(urlStr: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * A wrapper around fetch that prevents SSRF by validating the URL
+ * and all redirects against isSafeUrl.
+ */
+export async function safeFetch(
+  url: string,
+  options: RequestInit = {},
+  maxRedirects: number = 5
+): Promise<Response> {
+  let currentUrl = url;
+  let redirects = 0;
+
+  while (true) {
+    if (!(await isSafeUrl(currentUrl))) {
+      throw new Error(`SSRF Blocked: Unsafe URL: ${currentUrl}`);
+    }
+
+    // Disable automatic redirects to validate each step in the redirect chain
+    const response = await fetch(currentUrl, { ...options, redirect: 'manual' });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location || redirects >= maxRedirects) return response;
+
+      currentUrl = new URL(location, currentUrl).toString();
+      redirects++;
+      continue;
+    }
+
+    return response;
+  }
+}
