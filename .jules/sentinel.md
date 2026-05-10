@@ -17,3 +17,8 @@
 **Vulnerability:** The `fetchImagesFromUrl` action and `/api/proxy` endpoint fetched user-provided URLs without validating the target host, allowing potential access to internal services and private network resources.
 **Learning:** Server-side fetching of user-provided URLs is a high-risk operation. Validating the hostname string is insufficient as attackers can use DNS rebinding to point a public domain to a private IP address.
 **Prevention:** Implement a robust URL validation utility that checks for safe protocols, blocks private/reserved IP ranges, and performs DNS resolution to verify the actual IP address being accessed.
+
+## 2026-05-10 - [SSRF via Open Redirect in fetch]
+**Vulnerability:** The `fetch` API follows redirects by default. While the initial URL was validated against a safe-list/IP-check, an attacker could provide a URL that redirects to an internal, restricted URL (e.g., `http://169.254.169.254/`), bypassing the initial check.
+**Learning:** Security validation must occur at every step of a request chain. Validating only the initial URL is insufficient if the client automatically follows redirects.
+**Prevention:** Use `redirect: 'manual'` in fetch options and manually validate every URL in the redirect chain before following it.
