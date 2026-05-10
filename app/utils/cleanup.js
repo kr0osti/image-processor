@@ -25,21 +25,36 @@ export async function cleanupOldUploads(maxAgeMs = 60 * 60 * 1000) { // Default:
     // Skip .gitkeep file if it exists
     const filesToProcess = files.filter(file => file !== '.gitkeep');
     
-    for (const file of filesToProcess) {
-      const filePath = path.join(uploadsDir, file);
+    // Process files concurrently in batches to avoid EMFILE and memory issues
+    const BATCH_SIZE = 50; // Moderate batch size for fs operations
+
+    for (let i = 0; i < filesToProcess.length; i += BATCH_SIZE) {
+      const batch = filesToProcess.slice(i, i + BATCH_SIZE);
       
-      try {
+      const results = await Promise.allSettled(batch.map(async (file) => {
+        const filePath = path.join(uploadsDir, file);
         const fileStat = await stat(filePath);
         const fileAge = now - fileStat.mtimeMs;
         
         // If file is older than maxAgeMs, delete it
         if (fileAge > maxAgeMs) {
           await unlink(filePath);
-          deleted++;
+          return true; // Indicates file was deleted
         }
-      } catch (err) {
-        console.error(`Error processing file ${file}:`, err);
-        errors++;
+        return false; // Indicates file was kept
+      }));
+
+      // Process results
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        if (result.status === 'fulfilled') {
+          if (result.value === true) {
+            deleted++;
+          }
+        } else {
+          console.error(`Error processing file ${batch[j]}:`, result.reason);
+          errors++;
+        }
       }
     }
     
