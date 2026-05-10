@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import cronParser from 'cron-parser';
 import { cleanupOldUploads } from '../cleanup';
 
 let task: any = null;
@@ -17,10 +18,20 @@ export function initCronJobs() {
   task = cron.schedule(schedule, async () => {
     console.log(`Running cleanup at ${new Date().toISOString()}`);
     try {
-      // 1 hour default
-      const maxAgeMs = 60 * 60 * 1000;
+      // Calculate max age based on the cron schedule interval
+      let maxAgeMs = 60 * 60 * 1000; // 1 hour default
+
+      try {
+        const interval = cronParser.parse(schedule);
+        const next = interval.next().getTime();
+        const next2 = interval.next().getTime();
+        maxAgeMs = next2 - next;
+      } catch (err) {
+        console.error('Error parsing cron schedule, falling back to 1 hour max age:', err);
+      }
+
       const result = await cleanupOldUploads(maxAgeMs);
-      console.log(`Cleanup complete. Deleted ${result.deleted} files, encountered ${result.errors} errors.`);
+      console.log(`Cleanup complete. Deleted ${result.deleted} files (older than ${maxAgeMs}ms), encountered ${result.errors} errors.`);
     } catch (error) {
       console.error('Error in cleanup cron job:', error);
     }
