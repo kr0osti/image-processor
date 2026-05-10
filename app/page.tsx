@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import React from 'react';
 
 // This is fine at module level - it's not a hook
@@ -61,6 +61,18 @@ export default function ImageProcessor() {
   const [fetchedImages, setFetchedImages] = useState<string[]>([])
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [imageMetadata, setImageMetadata] = useState<ImageMetadata[]>([])
+
+  const sizeCounts = useMemo(() => {
+    const counts = { small: 0, medium: 0, large: 0, unknown: 0 };
+    imageMetadata.forEach(m => {
+      const size = m.size || 'unknown';
+      if (size in counts) {
+        counts[size as keyof typeof counts]++;
+      }
+    });
+    return counts;
+  }, [imageMetadata]);
+
   const [sizeFilter, setSizeFilter] = useState<('small' | 'medium' | 'large' | 'unknown')[]>(['large'])
   const [filteredImages, setFilteredImages] = useState<string[]>([])
   const [minWidth, setMinWidth] = useState<number | undefined>(undefined)
@@ -1334,7 +1346,7 @@ export default function ImageProcessor() {
                                 onCheckedChange={() => toggleSizeFilter('small')}
                               />
                               <label htmlFor="size-small" className="text-sm">
-                                Small ({imageMetadata.filter(m => m.size === 'small').length})
+                                Small ({sizeCounts.small})
                               </label>
                             </div>
 
@@ -1345,7 +1357,7 @@ export default function ImageProcessor() {
                                 onCheckedChange={() => toggleSizeFilter('medium')}
                               />
                               <label htmlFor="size-medium" className="text-sm">
-                                Medium ({imageMetadata.filter(m => m.size === 'medium').length})
+                                Medium ({sizeCounts.medium})
                               </label>
                             </div>
 
@@ -1356,7 +1368,7 @@ export default function ImageProcessor() {
                                 onCheckedChange={() => toggleSizeFilter('large')}
                               />
                               <label htmlFor="size-large" className="text-sm">
-                                Large ({imageMetadata.filter(m => m.size === 'large').length})
+                                Large ({sizeCounts.large})
                               </label>
                             </div>
                           </div>
