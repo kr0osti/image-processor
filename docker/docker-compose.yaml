@@ -18,6 +18,7 @@ services:
       - NEXT_PUBLIC_SITE_THEME_COLOR=${NEXT_PUBLIC_SITE_THEME_COLOR}
       - NEXT_PUBLIC_SITE_BACKGROUND_COLOR=${NEXT_PUBLIC_SITE_BACKGROUND_COLOR}
       - CLEANUP_API_KEY=${CLEANUP_API_KEY}
+      - CLEANUP_CRON_SCHEDULE=${CLEANUP_CRON_SCHEDULE:-"* * * * *"}
     volumes:
       - ./custom-icons:/app/public/custom-icons
       - ./public/uploads:/app/public/uploads
@@ -28,18 +29,3 @@ services:
       retries: 3
       start_period: 30s
 
-  cleanup-cron:
-    image: ghcr.io/kr0osti/image-processor/cleanup-service:${VERSION:-latest}
-    restart: unless-stopped
-    container_name: nextjs-image-cleanup
-    depends_on:
-      - app
-    env_file:
-      - .env
-    environment:
-      - CLEANUP_API_KEY=${CLEANUP_API_KEY}
-    volumes:
-      - cleanup-logs:/var/log
-
-volumes:
-  cleanup-logs:

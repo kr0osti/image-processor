@@ -61,6 +61,7 @@ Customize the application by setting these environment variables in your `.env` 
 | `NEXT_PUBLIC_SITE_THEME_COLOR` | Theme color (hex) | #000000 |
 | `NEXT_PUBLIC_SITE_BACKGROUND_COLOR` | Background color (hex) | #ffffff |
 | `CLEANUP_API_KEY` | API key for the cleanup endpoint | change-this-to-a-secure-key |
+| `CLEANUP_CRON_SCHEDULE` | Cron schedule for the cleanup job | * * * * * |
 | `NEXT_PUBLIC_DEBUG` | Enable debug logging | false |
 
 ## 🏗️ Architecture
@@ -69,8 +70,7 @@ Customize the application by setting these environment variables in your `.env` 
 
 The application consists of two main components:
 
-1. **Main Application**: A Next.js application that handles image processing
-2. **Cleanup Service**: A service that runs every minute to delete uploaded files older than 1 hour
+1. **Main Application**: A Next.js application that handles image processing and runs a background cleanup cron job
 
 ### API Endpoints
 

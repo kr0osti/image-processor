@@ -79,7 +79,7 @@ describe('Proxy API', () => {
     global.fetch.mockResolvedValue(mockResponse);
 
     // Create a mock request with URL parameter
-    const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/image.jpg', nextUrl: { searchParams: new URL('http://localhost:3000/api/proxy?url=https://example.com/image.jpg').searchParams } };
+    const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/image.jpg', nextUrl: new URL('http://localhost:3000/api/proxy?url=https://example.com/image.jpg'), headers: new Map([['origin', 'http://localhost:3000']]) };
 
     // Call the API handler
     const response = await GET(request);
@@ -110,7 +110,7 @@ describe('Proxy API', () => {
     });
 
     // Create a mock request with URL parameter
-    const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg', nextUrl: { searchParams: new URL('http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg').searchParams } };
+    const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg', nextUrl: new URL('http://localhost:3000/api/proxy?url=https://example.com/not-found.jpg') };
 
     // Call the API handler
     const response = await GET(request);

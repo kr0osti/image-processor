@@ -21,6 +21,7 @@ services:
       - NEXT_PUBLIC_SITE_THEME_COLOR=${NEXT_PUBLIC_SITE_THEME_COLOR:-#000000}
       - NEXT_PUBLIC_SITE_BACKGROUND_COLOR=${NEXT_PUBLIC_SITE_BACKGROUND_COLOR:-#ffffff}
       - CLEANUP_API_KEY=${CLEANUP_API_KEY:-dev-api-key}
+      - CLEANUP_CRON_SCHEDULE=${CLEANUP_CRON_SCHEDULE:-"* * * * *"}
     volumes:
       - ../app:/app/app
       - ../components:/app/components
@@ -40,21 +41,3 @@ services:
       retries: 3
       start_period: 30s
 
-  cleanup-cron:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.cleanup
-    container_name: nextjs-image-cleanup-dev
-    restart: unless-stopped
-    depends_on:
-      - app
-    env_file:
-      - ../.env
-    environment:
-      - CLEANUP_API_KEY=${CLEANUP_API_KEY:-dev-api-key}
-    volumes:
-      - cleanup-logs:/var/log
-      - ../public/uploads:/app/public/uploads
-
-volumes:
-  cleanup-logs:
