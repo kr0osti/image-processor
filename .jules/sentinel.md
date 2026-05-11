@@ -22,3 +22,5 @@
 **Vulnerability:** The `fetch` API follows redirects by default. While the initial URL was validated against a safe-list/IP-check, an attacker could provide a URL that redirects to an internal, restricted URL (e.g., `http://169.254.169.254/`), bypassing the initial check.
 **Learning:** Security validation must occur at every step of a request chain. Validating only the initial URL is insufficient if the client automatically follows redirects.
 **Prevention:** Use `redirect: 'manual'` in fetch options and manually validate every URL in the redirect chain before following it.
+## 2026-05-10 - [Migration to Single Container Cleanup]
+**Summary:** The cleanup logic was previously handled by a separate Docker container with a simple script running a loop and curling the Next.js app. This was migrated to be an internal Next.js node-cron job, removing the need for a separate container, optimizing the resource usage and simplifying the application's architecture.
