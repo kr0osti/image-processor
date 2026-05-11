@@ -7,7 +7,7 @@ settings:
 dependencies:
   '@hookform/resolvers':
     specifier: ^3.9.1
-    version: 3.10.0(react-hook-form@7.55.0)
+    version: 3.10.0(react-hook-form@7.75.0)
   '@radix-ui/react-accordion':
     specifier: ^1.2.12
     version: 1.2.12(@types/react-dom@19.1.2)(@types/react@19.1.1)(react-dom@19.1.0)(react@19.1.0)
@@ -141,8 +141,8 @@ dependencies:
     specifier: ^19
     version: 19.1.0(react@19.1.0)
   react-hook-form:
-    specifier: ^7.54.1
-    version: 7.55.0(react@19.1.0)
+    specifier: ^7.75.0
+    version: 7.75.0(react@19.1.0)
   react-resizable-panels:
     specifier: ^3.0.6
     version: 3.0.6(react-dom@19.1.0)(react@19.1.0)
@@ -718,12 +718,12 @@ packages:
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
     dev: false
 
-  /@hookform/resolvers@3.10.0(react-hook-form@7.55.0):
+  /@hookform/resolvers@3.10.0(react-hook-form@7.75.0):
     resolution: {integrity: sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==}
     peerDependencies:
       react-hook-form: ^7.0.0
     dependencies:
-      react-hook-form: 7.55.0(react@19.1.0)
+      react-hook-form: 7.75.0(react@19.1.0)
     dev: false
 
   /@humanfs/core@0.19.1:
@@ -5944,8 +5944,8 @@ packages:
       react: 19.1.0
       scheduler: 0.26.0
 
-  /react-hook-form@7.55.0(react@19.1.0):
-    resolution: {integrity: sha512-XRnjsH3GVMQz1moZTW53MxfoWN7aDpUg/GpVNc4A3eXRVNdGXfbzJ4vM4aLQ8g6XCUh1nIbx70aaNCl7kxnjog==}
+  /react-hook-form@7.75.0(react@19.1.0):
+    resolution: {integrity: sha512-Ovv94H+0p3sJ7B9B5QxPuCP1u8V/cHuVGyH55cSwodYDtoJwK+fqk3vjfIgSX59I2U/bU4z0nRJ9HMLpNiWEmw==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
