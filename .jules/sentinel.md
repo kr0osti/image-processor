@@ -24,3 +24,7 @@
 **Prevention:** Use `redirect: 'manual'` in fetch options and manually validate every URL in the redirect chain before following it.
 ## 2026-05-10 - [Migration to Single Container Cleanup]
 **Summary:** The cleanup logic was previously handled by a separate Docker container with a simple script running a loop and curling the Next.js app. This was migrated to be an internal Next.js node-cron job, removing the need for a separate container, optimizing the resource usage and simplifying the application's architecture.
+## 2025-02-25 - form-data Math.random() Vulnerability
+**Vulnerability:** The `form-data` package (< 4.0.4) used the predictable `Math.random()` function to generate boundary values for multipart form-encoded data.
+**Learning:** Because `Math.random()` generates pseudo-random and predictable sequences, an attacker who can observe some outputs (e.g., from generated request IDs) might predict the boundary value. This predictability allows an attacker to inject additional arbitrary parameters into a request, potentially leading to SSRF or data tampering.
+**Prevention:** Use cryptographically secure pseudorandom number generators (CSPRNG), such as `crypto.randomBytes` or `crypto.randomUUID()`, for generating security-sensitive boundaries or tokens instead of `Math.random()`. Keep dependencies like `supertest` up to date to receive transitive vulnerability patches.
