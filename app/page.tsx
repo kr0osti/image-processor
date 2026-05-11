@@ -64,12 +64,12 @@ export default function ImageProcessor() {
 
   const sizeCounts = useMemo(() => {
     const counts = { small: 0, medium: 0, large: 0, unknown: 0 };
-    imageMetadata.forEach(m => {
-      const size = m.size || 'unknown';
-      if (size in counts) {
-        counts[size as keyof typeof counts]++;
-      }
-    });
+    for (const m of imageMetadata) {
+      if (m.size === 'small') counts.small++;
+      else if (m.size === 'medium') counts.medium++;
+      else if (m.size === 'large') counts.large++;
+      else counts.unknown++;
+    }
     return counts;
   }, [imageMetadata]);
 
@@ -1201,11 +1201,12 @@ export default function ImageProcessor() {
           }
 
           if (loaded === urls.length) {
-            const counts = {
-              small: updated.filter(m => m.size === 'small').length,
-              medium: updated.filter(m => m.size === 'medium').length,
-              large: updated.filter(m => m.size === 'large').length,
-              unknown: updated.filter(m => m.size === 'unknown').length
+            const counts = { small: 0, medium: 0, large: 0, unknown: 0 };
+            for (const m of updated) {
+              if (m.size === 'small') counts.small++;
+              else if (m.size === 'medium') counts.medium++;
+              else if (m.size === 'large') counts.large++;
+              else counts.unknown++;
             }
 
             addLog(`Image sizes: ${counts.small} small, ${counts.medium} medium, ${counts.large} large, ${counts.unknown} unknown`)
