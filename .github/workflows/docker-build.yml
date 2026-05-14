@@ -106,7 +106,7 @@ jobs:
 
       - name: Build and push main app image
         if: env.SHOULD_BUILD == 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./docker/Dockerfile
@@ -133,7 +133,7 @@ jobs:
 
       - name: Build and push cleanup service image
         if: env.SHOULD_BUILD == 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./docker/Dockerfile.cleanup
