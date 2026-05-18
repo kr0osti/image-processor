@@ -91,7 +91,7 @@ dependencies:
     version: 1.2.8(@types/react-dom@19.1.2)(@types/react@19.1.1)(react-dom@19.1.0)(react@19.1.0)
   autoprefixer:
     specifier: ^10.4.19
-    version: 10.4.19(postcss@8.5.10)
+    version: 10.4.19(postcss@8.5.14)
   cheerio:
     specifier: latest
     version: 1.1.2
@@ -206,8 +206,8 @@ devDependencies:
     specifier: ^1.17.2
     version: 1.17.2(@types/node@24.12.2)
   postcss:
-    specifier: ^8.5.10
-    version: 8.5.10
+    specifier: ^8.5.14
+    version: 8.5.14
   supertest:
     specifier: ^7.2.2
     version: 7.2.2
@@ -3154,7 +3154,7 @@ packages:
       '@alloc/quick-lru': 5.2.0
       '@tailwindcss/node': 4.3.0
       '@tailwindcss/oxide': 4.3.0
-      postcss: 8.5.10
+      postcss: 8.5.14
       tailwindcss: 4.3.0
     dev: true
 
@@ -3477,7 +3477,7 @@ packages:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
     dev: true
 
-  /autoprefixer@10.4.19(postcss@8.5.10):
+  /autoprefixer@10.4.19(postcss@8.5.14):
     resolution: {integrity: sha512-BaENR2+zBZ8xXhM4pUaKUxlVdxZ0EZhjvbopwnXmxRUfqDmwSpC2lAi/QXvx7NRdPCo1WKEcEF6mV64si1z4Ew==}
     engines: {node: ^10 || ^12 || >=14}
     hasBin: true
@@ -3489,7 +3489,7 @@ packages:
       fraction.js: 4.3.7
       normalize-range: 0.1.2
       picocolors: 1.1.1
-      postcss: 8.5.10
+      postcss: 8.5.14
       postcss-value-parser: 4.2.0
     dev: false
 
@@ -5962,8 +5962,8 @@ packages:
       source-map-js: 1.2.1
     dev: false
 
-  /postcss@8.5.10:
-    resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
+  /postcss@8.5.14:
+    resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
     engines: {node: ^10 || ^12 || >=14}
     dependencies:
       nanoid: 3.3.12
