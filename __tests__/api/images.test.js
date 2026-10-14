@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server';
 import { POST } from '../../app/api/images/route';
 import { jest } from '@jest/globals';
 

@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable no-console -- debug-only component, renders only in development or with NEXT_PUBLIC_DEBUG */
 
 import { useEffect } from 'react';
 

@@ -1,14 +1,11 @@
 const fs = require('fs');
-const fsPromises = require('fs/promises');
 const path = require('path');
 const { cleanupOldUploads } = require('../../app/utils/cleanup');
 
 describe('Cleanup Utility', () => {
-  let tmpDir;
   let originalCwd;
 
   beforeAll(() => {
-    tmpDir = path.join(__dirname, 'tmp-uploads');
     originalCwd = process.cwd;
     process.cwd = () => path.join(__dirname, 'tmp');
   });

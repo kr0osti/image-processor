@@ -1,8 +1,5 @@
 import net from 'net';
 import dns from 'dns';
-import { promisify } from 'util';
-
-const lookup = promisify(dns.lookup);
 
 const blockList = new net.BlockList();
 
@@ -106,13 +103,13 @@ export async function isSafeUrl(urlStr: string): Promise<boolean> {
           return false;
         }
       }
-    } catch (dnsErr) {
+    } catch {
       // If DNS lookup fails, we block it for security.
       return false;
     }
 
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 }

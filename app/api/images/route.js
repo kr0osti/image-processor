@@ -9,7 +9,7 @@ import { createRateLimiter } from '../../utils/rate-limit.js';
 // Run cleanup on server start (will run when this file is first imported)
 (async () => {
   try {
-    const result = await cleanupOldUploads();
+    await cleanupOldUploads();
   } catch (error) {
     console.error('Error during initial cleanup:', error);
   }

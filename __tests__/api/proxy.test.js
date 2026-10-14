@@ -1,26 +1,6 @@
 // Import the function to test first
 import { GET } from '../../app/api/proxy/route';
 
-// Mock NextRequest and NextResponse
-class MockNextRequest2 {
-  constructor(url) {
-    this.url = url;
-    this.nextUrl = new URL(url);
-  }
-}
-
-class MockNextResponse {
-  constructor(body, init = {}) {
-    this.body = body;
-    this.status = init.status || 200;
-    this.headers = new Map(Object.entries(init.headers || {}));
-  }
-
-  json() {
-    return Promise.resolve(this.body);
-  }
-}
-
 // Mock next/server
 jest.mock('next/server', () => {
   return {

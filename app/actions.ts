@@ -1,7 +1,7 @@
 "use server"
 
 import * as cheerio from "cheerio"
-import { isSafeUrl, safeFetch, readBodyWithLimit } from "@/lib/ssrf"
+import { safeFetch, readBodyWithLimit } from "@/lib/ssrf"
 
 // Maximum size of a scraped HTML page (10 MB)
 const MAX_HTML_BYTES = 10 * 1024 * 1024

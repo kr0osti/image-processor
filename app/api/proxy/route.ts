@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRateLimiter } from '../../utils/rate-limit.js';
-import { isSafeUrl, safeFetch, readBodyWithLimit } from '@/lib/ssrf';
+import { safeFetch, readBodyWithLimit } from '@/lib/ssrf';
 
 // Maximum size of a proxied image (25 MB)
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;

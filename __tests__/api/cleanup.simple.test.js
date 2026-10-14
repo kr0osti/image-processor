@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server';
 import { GET } from '../../app/api/cleanup/route';
 
 // Mock the cleanup utility
