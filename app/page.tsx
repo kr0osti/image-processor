@@ -1400,8 +1400,8 @@ export default function ImageProcessor() {
                 <div
                   className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 cursor-pointer transition-colors ${
                     isDragging 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-300 hover:bg-gray-50'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
+                      : 'border-border hover:bg-muted'
                   }`}
                   onClick={triggerFileInput}
                   onDragOver={handleDragOver}
@@ -1409,9 +1409,9 @@ export default function ImageProcessor() {
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
-                  <Upload className="h-8 w-8 mb-4 text-gray-400" />
-                  <p className="text-sm text-gray-500 mb-1">Click to upload or drag and drop</p>
-                  <p className="text-xs text-gray-400">PNG, JPG, WEBP, GIF up to 10MB</p>
+                  <Upload className="h-8 w-8 mb-4 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mb-1">Click to upload or drag and drop</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, WEBP, GIF up to 10MB</p>
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -1445,7 +1445,7 @@ export default function ImageProcessor() {
                         Delete All Files
                       </Button>
                     </div>
-                    <ul className="text-sm text-gray-500 space-y-1">
+                    <ul className="text-sm text-muted-foreground space-y-1">
                       {uploadedFiles.map(({ file, url }) => (
                         <li key={url}>
                           {file.name} ({(file.size / 1024).toFixed(2)} KB)
@@ -1550,7 +1550,7 @@ export default function ImageProcessor() {
                       </div>
                     )}
                     <div className="p-3 flex justify-between items-center">
-                      <span className="text-sm text-gray-500">Image {index + 1}</span>
+                      <span className="text-sm text-muted-foreground">Image {index + 1}</span>
                       <div className="flex space-x-2">
                         <Button size="sm" variant="outline" onClick={() => copyImageUrl(img.url)}>
                           <Copy className="h-4 w-4 mr-2" />
@@ -1568,7 +1568,7 @@ export default function ImageProcessor() {
             </div>
           )}
         </CardContent>
-        <CardFooter className="text-sm text-gray-500">
+        <CardFooter className="text-sm text-muted-foreground">
           All images will be processed to 1500x1500px with appropriate positioning
         </CardFooter>
       </Card>
