@@ -1,5 +1,6 @@
 import net from 'net';
 import dns from 'dns';
+import { Agent, fetch as undiciFetch, type RequestInit as UndiciRequestInit } from 'undici';
 
 const blockList = new net.BlockList();
 
@@ -21,15 +22,22 @@ const blockList = new net.BlockList();
   ['240.0.0.0', 4],
 ] as const).forEach(([address, prefix]) => blockList.addSubnet(address, prefix, 'ipv4'));
 
-// IPv6 unspecified, loopback, unique-local, link-local, multicast and documentation ranges
+// IPv6 unspecified, loopback, discard, unique-local, link-local, multicast and documentation
+// ranges, plus 6to4 and Teredo, which can tunnel to arbitrary IPv4 addresses
 ([
   ['::', 128],
   ['::1', 128],
+  ['100::', 64],
   ['fc00::', 7],
   ['fe80::', 10],
   ['ff00::', 8],
   ['2001:db8::', 32],
+  ['2002::', 16],
+  ['2001::', 32],
 ] as const).forEach(([address, prefix]) => blockList.addSubnet(address, prefix, 'ipv6'));
+
+// Lets self-hosted setups fetch from their own network on purpose
+const allowInternalNetwork = () => process.env.ALLOW_INTERNAL_NETWORK_FETCHING === 'true';
 
 /**
  * Checks if an IP address is private or reserved.
@@ -72,8 +80,7 @@ export async function isSafeUrl(urlStr: string): Promise<boolean> {
       return false;
     }
 
-    const allowInternal = process.env.ALLOW_INTERNAL_NETWORK_FETCHING === 'true';
-    if (allowInternal) return true;
+    if (allowInternalNetwork()) return true;
 
     let hostname = parsed.hostname.toLowerCase();
 
@@ -87,8 +94,9 @@ export async function isSafeUrl(urlStr: string): Promise<boolean> {
       return false;
     }
 
-    // DNS Resolution check to prevent DNS Rebinding and validate IP literals
-    // Using { all: true } to check ALL resolved addresses
+    // Early check of ALL resolved addresses (and IP literals) for a clear error.
+    // This alone does not stop DNS rebinding, since fetch resolves the name again;
+    // safeLookup re-checks the addresses actually connected to.
     try {
       // dns.lookup handles IP literals correctly by returning them as is.
       const addresses = await new Promise<dns.LookupAddress[]>((resolve, reject) => {
@@ -114,9 +122,46 @@ export async function isSafeUrl(urlStr: string): Promise<boolean> {
   }
 }
 
+type LookupCallback = (err: NodeJS.ErrnoException | null, address: string | dns.LookupAddress[], family?: number) => void;
+
 /**
- * A wrapper around fetch that prevents SSRF by validating the URL
- * and all redirects against isSafeUrl.
+ * dns.lookup replacement used when opening connections. It refuses to return
+ * private or reserved addresses, so a socket can only connect to an address
+ * that passed the check. This closes the DNS-rebinding gap where a hostname
+ * resolves to a public IP for isSafeUrl and to an internal one for the request.
+ */
+export function safeLookup(hostname: string, options: dns.LookupOptions, callback: LookupCallback): void {
+  dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
+    if (err) {
+      callback(err, '', 0);
+      return;
+    }
+    const list = addresses as dns.LookupAddress[];
+    const blocked = list.find(({ address }) => isPrivateIP(address));
+    if (blocked && !allowInternalNetwork()) {
+      const error: NodeJS.ErrnoException = new Error(
+        `SSRF Blocked: ${hostname} resolves to private address ${blocked.address}`,
+      );
+      error.code = 'ESSRFBLOCKED';
+      callback(error, '', 0);
+      return;
+    }
+    if (options?.all) {
+      callback(null, list);
+    } else {
+      callback(null, list[0].address, list[0].family);
+    }
+  });
+}
+
+// Connection pool whose DNS lookups go through safeLookup
+const safeAgent = new Agent({ connect: { lookup: safeLookup } });
+
+/**
+ * A wrapper around fetch that prevents SSRF: the URL and every redirect are
+ * validated with isSafeUrl, and connections can only be made to addresses
+ * that pass safeLookup. Uses undici's fetch directly so the dispatcher is
+ * honoured (Next.js patches the global fetch).
  */
 export async function safeFetch(
   url: string,
@@ -132,7 +177,11 @@ export async function safeFetch(
     }
 
     // Disable automatic redirects to validate each step in the redirect chain
-    const response = await fetch(currentUrl, { ...options, redirect: 'manual' });
+    const response = (await undiciFetch(currentUrl, {
+      ...(options as UndiciRequestInit),
+      redirect: 'manual',
+      dispatcher: safeAgent,
+    })) as unknown as Response;
 
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
