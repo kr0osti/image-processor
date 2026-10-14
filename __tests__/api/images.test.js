@@ -119,15 +119,57 @@ describe('Images API', () => {
     expect(data.message).toBe('Image saved successfully');
   });
 
-  // Test for timeout handling
-  // This test is challenging to implement in Jest because it requires mocking
-  // the global setTimeout in a way that doesn't interfere with Jest's own timers
-  // For now, we'll skip this test and focus on the other functionality
-  it.skip('should handle timeouts gracefully', async () => {
-    // This test is skipped because it's difficult to properly mock timeouts
-    // in a way that works consistently in the Docker environment
+  describe('request timeout', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
 
-    // In a real-world scenario, we would test this with an integration test
-    // that actually waits for the timeout to occur
+    afterEach(() => {
+      jest.useRealTimers();
+      console.error.mockRestore();
+    });
+
+    it('should return 504 when handling takes longer than 60 seconds', async () => {
+      // A request body that never finishes arriving
+      const req = {
+        headers: { get: (name) => name.toLowerCase() === 'content-type' ? 'application/json' : null },
+        json: () => new Promise(() => {}),
+      };
+
+      const pending = POST(req);
+      await jest.advanceTimersByTimeAsync(59_999);
+      let settled = false;
+      pending.then(() => { settled = true; });
+      await Promise.resolve();
+      expect(settled).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
+      const response = await pending;
+      const data = await response.json();
+
+      expect(response.status).toBe(504);
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('Request processing timed out after 60 seconds');
+    });
+
+    it('should clear the timer once a request finishes', async () => {
+      const response = await POST(createMockRequest({ dataUrl: null }));
+
+      expect(response.status).toBe(400);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('should clear the timer when the handler throws', async () => {
+      const req = {
+        headers: { get: (name) => name.toLowerCase() === 'content-type' ? 'application/json' : null },
+        json: () => Promise.reject(new Error('Invalid JSON')),
+      };
+
+      const response = await POST(req);
+
+      expect(response.status).toBe(500);
+      expect(jest.getTimerCount()).toBe(0);
+    });
   });
 });
