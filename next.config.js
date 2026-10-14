@@ -3,6 +3,8 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Hosts allowed to load dev-server resources (next dev only), e.g. a LAN IP
+  allowedDevOrigins: process.env.ALLOWED_DEV_ORIGINS ? process.env.ALLOWED_DEV_ORIGINS.split(',') : [],
   // Increase API limits for handling large images
   serverExternalPackages: ['sharp'],
   images: {
