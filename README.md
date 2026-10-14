@@ -34,6 +34,14 @@ docker compose up -d
 
 The application will be available at http://localhost:6060
 
+To update, pull the latest code and image and recreate the container. Every push to `main` publishes a new `latest` image to `ghcr.io/kr0osti/image-processor/nextjs-app` (set `VERSION` in `.env` to pin a release, e.g. `0.7.0`):
+
+```bash
+git pull
+docker compose pull
+docker compose up -d
+```
+
 ### Local Development
 
 ```bash

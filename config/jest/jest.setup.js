@@ -76,8 +76,6 @@ process.env.NEXT_PUBLIC_SITE_DESCRIPTION = 'Test environment for image processin
 process.env.NEXT_PUBLIC_SITE_URL = 'http://localhost:3000';
 process.env.CLEANUP_API_KEY = 'test-api-key';
 
-// We're using manual mocks for next/server in __mocks__/next/server.js
-
 // Mock canvas for testing only if in a browser environment
 if (typeof window !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
   global.HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
