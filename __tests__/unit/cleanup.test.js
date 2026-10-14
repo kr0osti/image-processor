@@ -85,9 +85,9 @@ describe('Cleanup Utility', () => {
     // Act
     const result = await cleanupOldUploads(60 * 60 * 1000); // 1 hour
 
-    // Assert
-    // The actual result is different from what we expected
-    // Let's update our expectation to match the actual implementation
-    expect(result).toEqual({ deleted: 0, errors: 1 });
+    // Assert: only the 2-hour-old file is deleted; .gitkeep is skipped
+    expect(result).toEqual({ deleted: 1, errors: 0 });
+    expect(fsPromises.unlink).toHaveBeenCalledTimes(1);
+    expect(fsPromises.unlink).toHaveBeenCalledWith(expect.stringContaining('file1.jpg'));
   });
 });
