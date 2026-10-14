@@ -132,10 +132,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build Docker images
+      - name: Build Docker image
         run: |
           docker build -f docker/Dockerfile --target runner -t ghcr.io/${{ github.repository }}/nextjs-app:test .
-          docker build -f docker/Dockerfile.cleanup -t ghcr.io/${{ github.repository }}/cleanup-service:test .
 
       - name: Create test directories
         run: |
@@ -199,4 +198,3 @@ jobs:
           rm -rf test-custom-icons test-uploads
           docker compose -f docker/docker-compose-test.yml down || true
           docker image rm ghcr.io/${{ github.repository }}/nextjs-app:test || true
-          docker image rm ghcr.io/${{ github.repository }}/cleanup-service:test || true
