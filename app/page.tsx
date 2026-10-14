@@ -1077,25 +1077,58 @@ export default function ImageProcessor() {
   }
 
   // Remove one processed image, and its uploaded file if it came from an upload
-  const removeProcessedImage = (id: number) => {
+  /**
+   * Deletes saved images on the server (DELETE /api/images), using the token
+   * each one was saved with. Returns the counts, or throws if any file could not be deleted.
+   */
+  const deleteServerFiles = async (images: ProcessedImage[]): Promise<{ deleted: number; missing: number }> => {
+    // One entry per server file: images with the same upload name share a file
+    const files = [...new Map(
+      images.flatMap((img) => (img.filename && img.deleteToken ? [[img.filename, img.deleteToken] as const] : [])),
+    )].map(([filename, token]) => ({ filename, token }))
+    if (files.length === 0) return { deleted: 0, missing: 0 }
+
+    const response = await fetch('/api/images', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok || data.rejected > 0) {
+      throw new Error(data.message || `Server responded with ${response.status}`)
+    }
+    return { deleted: data.deleted, missing: data.missing }
+  }
+
+  const removeProcessedImage = async (id: number) => {
     const target = processedImages.find((img) => img.id === id)
     if (!target) return
+    const others = processedImages.filter((img) => img.id !== id)
 
     setProcessedImages((prev) => prev.filter((img) => img.id !== id))
 
     // Only drop the source if no other result was rendered from it
-    if (!processedImages.some((img) => img.id !== id && img.sourceUrl === target.sourceUrl)) {
+    if (!others.some((img) => img.sourceUrl === target.sourceUrl)) {
       revokeBlobUrls([target.sourceUrl])
       setUploadedFiles((prev) => prev.filter((upload) => upload.url !== target.sourceUrl))
     }
     addLog(`Removed processed image: ${target.url}`)
+
+    // Delete the saved file too, unless another card still shows the same server file
+    if (!target.filename || others.some((img) => img.filename === target.filename)) return
+    try {
+      await deleteServerFiles([target])
+      addLog(`Deleted ${target.filename} from the server`)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      addLog(`Error deleting ${target.filename} from the server: ${errorMessage}`)
+      toast.warning(t("toasts.removeFailed"))
+    }
   }
 
   const deleteAllFiles = async () => {
-    // Files this session saved on the server, with the tokens that prove it
-    const files = processedImages.flatMap((img) =>
-      img.filename && img.deleteToken ? [{ filename: img.filename, token: img.deleteToken }] : [],
-    )
+    // Images this session saved on the server
+    const saved = processedImages.filter((img) => img.filename && img.deleteToken)
 
     // Clean up object URLs
     revokeBlobUrls(uploadedFiles.map((upload) => upload.url))
@@ -1106,23 +1139,15 @@ export default function ImageProcessor() {
     setFetchedImages([])
     setSelectedImages([])
 
-    if (files.length === 0) {
+    if (saved.length === 0) {
       addLog("All files cleared")
       return
     }
 
     try {
-      const response = await fetch('/api/images', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok || data.rejected > 0) {
-        throw new Error(data.message || `Server responded with ${response.status}`)
-      }
-      addLog(`Deleted ${data.deleted} files from the server (${data.missing} already gone)`)
-      toast.success(t("toasts.filesDeleted", { count: data.deleted + data.missing }))
+      const { deleted, missing } = await deleteServerFiles(saved)
+      addLog(`Deleted ${deleted} files from the server (${missing} already gone)`)
+      toast.success(t("toasts.filesDeleted", { count: deleted + missing }))
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
       addLog(`Error deleting files from the server: ${errorMessage}`)

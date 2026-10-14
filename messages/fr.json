@@ -81,7 +81,8 @@
       "upscaled": "{count, plural, one {# image est plus petite que le format de sortie et a été agrandie. Elle risque d'être floue.} other {# images sont plus petites que le format de sortie et ont été agrandies. Elles risquent d'être floues.}}",
       "reprocessFailed": "Impossible de retraiter l'image {index}",
       "filesDeleted": "{count, plural, one {# fichier supprimé du serveur} other {# fichiers supprimés du serveur}}",
-      "deleteFailed": "Impossible de supprimer tous les fichiers du serveur. Les autres seront supprimés lors du nettoyage automatique."
+      "deleteFailed": "Impossible de supprimer tous les fichiers du serveur. Les autres seront supprimés lors du nettoyage automatique.",
+      "removeFailed": "Impossible de supprimer l'image du serveur. Elle sera supprimée lors du nettoyage automatique."
     },
     "errors": {
       "fetchFailed": "Une erreur est survenue lors de la récupération des images : {message}",

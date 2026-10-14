@@ -12,6 +12,7 @@ A powerful web application that allows you to download, process, and standardize
 - **Languages**: English, French, Spanish and German, picked from the browser language or the header switcher
 - **Light & Dark Themes**: Follows the system setting, with a toggle in the header
 - **Download Options**: Download individual images or as a ZIP archive
+- **Deleting**: The ✕ on a processed image and "Delete All Files" also delete the saved files from the server; files saved before a restart (without `UPLOAD_TOKEN_SECRET`) are left to the cleanup job
 - **CORS Handling**: Creates placeholders for images that can't be loaded due to CORS restrictions
 - **Automatic Cleanup**: A background job deletes processed files on the `CLEANUP_CRON_SCHEDULE` (by default every 30 minutes, removing files older than one interval)
 - **Rate Limiting**: The API endpoints are rate limited per client IP to prevent abuse (see the table below)

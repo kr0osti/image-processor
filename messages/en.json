@@ -81,7 +81,8 @@
       "upscaled": "{count, plural, one {# image is smaller than the output and was upscaled. It may look blurry.} other {# images are smaller than the output and were upscaled. They may look blurry.}}",
       "reprocessFailed": "Failed to reprocess image {index}",
       "filesDeleted": "{count, plural, one {Deleted # file from the server} other {Deleted # files from the server}}",
-      "deleteFailed": "Couldn't delete every file from the server. The rest will be removed by the scheduled cleanup."
+      "deleteFailed": "Couldn't delete every file from the server. The rest will be removed by the scheduled cleanup.",
+      "removeFailed": "Couldn't delete the image from the server. It will be removed by the scheduled cleanup."
     },
     "errors": {
       "fetchFailed": "An error occurred while fetching the images: {message}",
