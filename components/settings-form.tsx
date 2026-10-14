@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { RotateCcw, Save } from 'lucide-react'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -27,6 +28,7 @@ interface FieldProps {
 
 // Slider plus number input bound to the same value
 function RangeField({ id, label, description, unit, value, limits, onChange }: FieldProps) {
+  const t = useTranslations('Settings')
   const descriptionId = `${id}-description`
   return (
     <div className="space-y-3">
@@ -55,7 +57,7 @@ function RangeField({ id, label, description, unit, value, limits, onChange }: F
       </div>
       <input
         type="range"
-        aria-label={`${label} slider`}
+        aria-label={t('slider', { label })}
         min={limits.min}
         max={limits.max}
         step={limits.step}
@@ -72,6 +74,7 @@ function RangeField({ id, label, description, unit, value, limits, onChange }: F
 }
 
 export function SettingsForm({ initial }: { initial: ProcessingSettings }) {
+  const t = useTranslations('Settings')
   const [settings, setSettings] = React.useState(initial)
   const [saved, setSaved] = React.useState(initial)
 
@@ -89,7 +92,7 @@ export function SettingsForm({ initial }: { initial: ProcessingSettings }) {
     writeSettingsCookie(clean)
     setSettings(clean)
     setSaved(clean)
-    toast.success('Settings saved')
+    toast.success(t('saved'))
   }
 
   // Preview uses the clamped value so the diagram never inverts
@@ -99,21 +102,20 @@ export function SettingsForm({ initial }: { initial: ProcessingSettings }) {
   return (
     <form onSubmit={save} className="mt-8 space-y-6">
       <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
-        <h2 className="text-base font-semibold">White-background images</h2>
+        <h2 className="text-base font-semibold">{t('whiteBackgroundSection')}</h2>
         <div className="mt-6 grid gap-8 sm:grid-cols-[1fr_auto]">
           <RangeField
             id="padding"
-            label="Padding"
+            label={t('padding')}
             unit="px"
             value={settings.padding}
             limits={SETTINGS_LIMITS.padding}
             onChange={update('padding')}
-            description={
-              <>
-                Space added on each side of the {OUTPUT_SIZE}px canvas. The product is fitted into the remaining{' '}
-                <span className="font-mono">{contentSize(preview.padding)}×{contentSize(preview.padding)}</span> px.
-              </>
-            }
+            description={t.rich('paddingDescription', {
+              size: OUTPUT_SIZE,
+              content: contentSize(preview.padding),
+              mono: (chunks) => <span className="font-mono">{chunks}</span>,
+            })}
           />
           <figure className="mx-auto w-36 sm:w-40">
             <div
@@ -125,22 +127,22 @@ export function SettingsForm({ initial }: { initial: ProcessingSettings }) {
                 style={{ inset }}
               />
             </div>
-            <figcaption className="mt-2 text-center text-xs text-muted-foreground">Content area preview</figcaption>
+            <figcaption className="mt-2 text-center text-xs text-muted-foreground">{t('previewCaption')}</figcaption>
           </figure>
         </div>
       </section>
 
       <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
-        <h2 className="text-base font-semibold">Background detection</h2>
+        <h2 className="text-base font-semibold">{t('detectionSection')}</h2>
         <div className="mt-6">
           <RangeField
             id="white-threshold"
-            label="White detection threshold"
+            label={t('threshold')}
             unit="%"
             value={settings.whiteThreshold}
             limits={SETTINGS_LIMITS.whiteThreshold}
             onChange={update('whiteThreshold')}
-            description="Share of the sampled edge and center pixels that must be white for an image to get the padded white-background layout. Lower it if product shots on white aren't detected; raise it if photos are padded by mistake."
+            description={t('thresholdDescription')}
           />
         </div>
       </section>
@@ -153,11 +155,11 @@ export function SettingsForm({ initial }: { initial: ProcessingSettings }) {
           onClick={() => setSettings({ ...DEFAULT_SETTINGS })}
         >
           <RotateCcw className="h-4 w-4" />
-          Reset to defaults
+          {t('reset')}
         </Button>
         <Button type="submit" disabled={!dirty} className="shadow-sm shadow-primary/25">
           <Save className="h-4 w-4" />
-          Save settings
+          {t('save')}
         </Button>
       </div>
     </form>

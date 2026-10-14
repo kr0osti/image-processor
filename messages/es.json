@@ -1,0 +1,112 @@
+{
+  "Metadata": {
+    "description": "Descarga y procesa imágenes a 1500×1500 px con un posicionamiento adecuado",
+    "settingsTitle": "Ajustes"
+  },
+  "Header": {
+    "home": "Inicio",
+    "settings": "Ajustes",
+    "language": "Idioma",
+    "theme": {
+      "label": "Tema: {current}. Cambiar a {next}",
+      "system": "sistema",
+      "light": "claro",
+      "dark": "oscuro"
+    }
+  },
+  "Home": {
+    "badge": "1500 × 1500 px · centrada · lista para tu tienda",
+    "title": "Procesador de imágenes",
+    "subtitle": "Descarga y procesa imágenes a 1500×1500 px con un posicionamiento adecuado. Sube archivos o tráelos directamente desde una página web.",
+    "footer": "Todas las imágenes se procesarán a 1500×1500 px con un posicionamiento adecuado.",
+    "tabs": {
+      "upload": "Subir imágenes",
+      "webpage": "Desde una página web"
+    },
+    "upload": {
+      "dropTitle": "Arrastra y suelta las imágenes aquí",
+      "dropHint": "PNG, JPG, WEBP o GIF · hasta 10 MB cada una",
+      "button": "Subir imágenes",
+      "corsHint": "Subir archivos funciona con cualquier imagen de tu dispositivo y evita problemas de CORS.",
+      "uploadedFiles": "Archivos subidos",
+      "fileSize": "{size} KB"
+    },
+    "webpage": {
+      "urlLabel": "URL de la página web",
+      "fetch": "Obtener imágenes",
+      "fetching": "Obteniendo",
+      "customBase": "Usar una URL base personalizada para las rutas relativas",
+      "baseUrlLabel": "URL base",
+      "corsWarning": "Las imágenes de sitios web pueden estar protegidas por CORS. La aplicación creará marcadores de posición para las imágenes que no se puedan cargar directamente."
+    },
+    "found": {
+      "title": "Imágenes encontradas ({count})",
+      "size": "Tamaño",
+      "filterTitle": "Filtrar por tamaño",
+      "sizes": {
+        "small": "Pequeña",
+        "medium": "Mediana",
+        "large": "Grande"
+      },
+      "customSize": "Tamaño personalizado",
+      "minWidth": "Ancho mín.:",
+      "minHeight": "Alto mín.:",
+      "selectAll": "Seleccionar todo",
+      "deselectAll": "Deseleccionar todo",
+      "processSelected": "Procesar selección ({count})",
+      "imageAlt": "Imagen {index}"
+    },
+    "deleteAll": "Eliminar todos los archivos",
+    "processing": "Procesando imágenes…",
+    "processed": {
+      "title": "Imágenes procesadas ({count})",
+      "subtitle": "1500 × 1500 px, listas para descargar.",
+      "downloadIndividually": "Descargar una a una",
+      "downloadZip": "Descargar como ZIP",
+      "imageAlt": "Imagen procesada {index}",
+      "remove": "Quitar imagen {index}",
+      "whiteBackground": "Fondo blanco (con márgenes)",
+      "trimPadding": "Recortar los márgenes blancos de la imagen original",
+      "copyUrl": "Copiar URL",
+      "download": "Descargar",
+      "lowResBadge": "Baja resolución",
+      "lowResNote": "La imagen original solo mide <mono>{width}×{height}</mono> px y se amplió <mono>{factor}×</mono>, por lo que puede verse borrosa. Usa una imagen más grande.",
+      "lowResNotePadded": "La imagen original solo mide <mono>{width}×{height}</mono> px y se amplió <mono>{factor}×</mono>, por lo que puede verse borrosa. Usa una imagen más grande o aumenta los márgenes en Ajustes."
+    },
+    "toasts": {
+      "urlCopied": "URL completa de la imagen copiada al portapapeles",
+      "copyFailed": "No se pudo copiar la URL",
+      "dropImagesOnly": "Suelta solo archivos de imagen",
+      "skippedFiles": "{count, plural, one {Se omitió # archivo que no es una imagen} other {Se omitieron # archivos que no son imágenes}}",
+      "upscaled": "{count, plural, one {# imagen es más pequeña que la salida y se amplió. Puede verse borrosa.} other {# imágenes son más pequeñas que la salida y se ampliaron. Pueden verse borrosas.}}",
+      "reprocessFailed": "No se pudo volver a procesar la imagen {index}"
+    },
+    "errors": {
+      "fetchFailed": "Se produjo un error al obtener las imágenes: {message}",
+      "zipFailed": "No se pudo crear el archivo ZIP: {message}",
+      "selectImage": "Selecciona al menos una imagen para procesar"
+    }
+  },
+  "Actions": {
+    "fetchUrlFailed": "No se pudo cargar la URL: {statusText} ({status})",
+    "noImages": "No se encontraron imágenes en la página",
+    "notAllowed": "La URL indicada no está permitida por motivos de seguridad.",
+    "fetchImagesFailed": "No se pudieron obtener las imágenes de la URL: {message}"
+  },
+  "Settings": {
+    "back": "Volver al procesador",
+    "title": "Ajustes",
+    "intro": "Ajusta cómo se maquetan las imágenes. Los ajustes se guardan en una cookie en este dispositivo y se aplican a las próximas imágenes que proceses.",
+    "whiteBackgroundSection": "Imágenes con fondo blanco",
+    "padding": "Márgenes",
+    "paddingDescription": "Espacio añadido a cada lado del lienzo de {size} px. El producto se ajusta a los <mono>{content}×{content}</mono> px restantes.",
+    "previewCaption": "Vista previa del área de contenido",
+    "detectionSection": "Detección del fondo",
+    "threshold": "Umbral de detección de blanco",
+    "thresholdDescription": "Porcentaje de píxeles muestreados (bordes y centro) que deben ser blancos para que una imagen reciba la maquetación con fondo blanco y márgenes. Bájalo si no se detectan fotos de producto sobre fondo blanco; súbelo si se añaden márgenes a fotos por error.",
+    "slider": "Control deslizante de {label}",
+    "reset": "Restablecer valores predeterminados",
+    "save": "Guardar ajustes",
+    "saved": "Ajustes guardados"
+  }
+}

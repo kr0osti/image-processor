@@ -1,0 +1,112 @@
+{
+  "Metadata": {
+    "description": "Téléchargez et traitez des images en 1500×1500 px avec un positionnement adapté",
+    "settingsTitle": "Paramètres"
+  },
+  "Header": {
+    "home": "Accueil",
+    "settings": "Paramètres",
+    "language": "Langue",
+    "theme": {
+      "label": "Thème : {current}. Passer à {next}",
+      "system": "système",
+      "light": "clair",
+      "dark": "sombre"
+    }
+  },
+  "Home": {
+    "badge": "1500 × 1500 px · centré · prêt pour votre boutique",
+    "title": "Traitement d'images",
+    "subtitle": "Téléchargez et traitez des images en 1500×1500 px avec un positionnement adapté. Importez des fichiers ou récupérez-les directement depuis une page web.",
+    "footer": "Toutes les images seront traitées en 1500×1500 px avec un positionnement adapté.",
+    "tabs": {
+      "upload": "Importer des images",
+      "webpage": "Depuis une page web"
+    },
+    "upload": {
+      "dropTitle": "Glissez-déposez vos images ici",
+      "dropHint": "PNG, JPG, WEBP ou GIF · 10 Mo max. par fichier",
+      "button": "Importer des images",
+      "corsHint": "L'import fonctionne avec n'importe quelle image de votre appareil et évite les problèmes de CORS.",
+      "uploadedFiles": "Fichiers importés",
+      "fileSize": "{size} Ko"
+    },
+    "webpage": {
+      "urlLabel": "URL de la page web",
+      "fetch": "Récupérer les images",
+      "fetching": "Récupération",
+      "customBase": "Utiliser une URL de base personnalisée pour les chemins relatifs",
+      "baseUrlLabel": "URL de base",
+      "corsWarning": "Les images des sites web peuvent être protégées par CORS. L'application créera des images de remplacement pour celles qui ne peuvent pas être chargées directement."
+    },
+    "found": {
+      "title": "Images trouvées ({count})",
+      "size": "Taille",
+      "filterTitle": "Filtrer par taille",
+      "sizes": {
+        "small": "Petite",
+        "medium": "Moyenne",
+        "large": "Grande"
+      },
+      "customSize": "Taille personnalisée",
+      "minWidth": "Largeur min. :",
+      "minHeight": "Hauteur min. :",
+      "selectAll": "Tout sélectionner",
+      "deselectAll": "Tout désélectionner",
+      "processSelected": "Traiter la sélection ({count})",
+      "imageAlt": "Image {index}"
+    },
+    "deleteAll": "Supprimer tous les fichiers",
+    "processing": "Traitement des images…",
+    "processed": {
+      "title": "Images traitées ({count})",
+      "subtitle": "1500 × 1500 px, prêtes à télécharger.",
+      "downloadIndividually": "Télécharger une par une",
+      "downloadZip": "Télécharger en ZIP",
+      "imageAlt": "Image traitée {index}",
+      "remove": "Retirer l'image {index}",
+      "whiteBackground": "Fond blanc (avec marges)",
+      "trimPadding": "Rogner les marges blanches de la source",
+      "copyUrl": "Copier l'URL",
+      "download": "Télécharger",
+      "lowResBadge": "Basse résolution",
+      "lowResNote": "La source ne fait que <mono>{width}×{height}</mono> px et a été agrandie <mono>{factor}×</mono> : elle risque d'être floue. Utilisez une image plus grande.",
+      "lowResNotePadded": "La source ne fait que <mono>{width}×{height}</mono> px et a été agrandie <mono>{factor}×</mono> : elle risque d'être floue. Utilisez une image plus grande ou augmentez les marges dans les paramètres."
+    },
+    "toasts": {
+      "urlCopied": "URL complète de l'image copiée dans le presse-papiers",
+      "copyFailed": "Impossible de copier l'URL",
+      "dropImagesOnly": "Veuillez déposer uniquement des fichiers image",
+      "skippedFiles": "{count, plural, one {# fichier ignoré (pas une image)} other {# fichiers ignorés (pas des images)}}",
+      "upscaled": "{count, plural, one {# image est plus petite que le format de sortie et a été agrandie. Elle risque d'être floue.} other {# images sont plus petites que le format de sortie et ont été agrandies. Elles risquent d'être floues.}}",
+      "reprocessFailed": "Impossible de retraiter l'image {index}"
+    },
+    "errors": {
+      "fetchFailed": "Une erreur est survenue lors de la récupération des images : {message}",
+      "zipFailed": "Impossible de créer le fichier ZIP : {message}",
+      "selectImage": "Veuillez sélectionner au moins une image à traiter"
+    }
+  },
+  "Actions": {
+    "fetchUrlFailed": "Impossible de charger l'URL : {statusText} ({status})",
+    "noImages": "Aucune image trouvée sur la page",
+    "notAllowed": "Cette URL n'est pas autorisée pour des raisons de sécurité.",
+    "fetchImagesFailed": "Impossible de récupérer les images depuis l'URL : {message}"
+  },
+  "Settings": {
+    "back": "Retour au traitement",
+    "title": "Paramètres",
+    "intro": "Ajustez la mise en page des images. Les paramètres sont enregistrés dans un cookie sur cet appareil et s'appliquent aux prochaines images traitées.",
+    "whiteBackgroundSection": "Images sur fond blanc",
+    "padding": "Marges",
+    "paddingDescription": "Espace ajouté de chaque côté du canevas de {size} px. Le produit est ajusté dans les <mono>{content}×{content}</mono> px restants.",
+    "previewCaption": "Aperçu de la zone de contenu",
+    "detectionSection": "Détection du fond",
+    "threshold": "Seuil de détection du blanc",
+    "thresholdDescription": "Part des pixels échantillonnés (bords et centre) qui doivent être blancs pour qu'une image reçoive la mise en page sur fond blanc avec marges. Baissez-le si des photos produit sur fond blanc ne sont pas détectées ; augmentez-le si des photos reçoivent des marges par erreur.",
+    "slider": "Curseur {label}",
+    "reset": "Rétablir les valeurs par défaut",
+    "save": "Enregistrer",
+    "saved": "Paramètres enregistrés"
+  }
+}

@@ -1,6 +1,7 @@
 "use server"
 
 import * as cheerio from "cheerio"
+import { getTranslations } from "next-intl/server"
 import { safeFetch, readBodyWithLimit } from "@/lib/ssrf"
 
 // Maximum size of a scraped HTML page (10 MB)
@@ -24,6 +25,8 @@ export interface ImageMetadata {
  * @throws {Error} If fetching or parsing fails
  */
 export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
+  // Errors are shown to the user, so they use the request's language
+  const t = await getTranslations("Actions")
   const logs: string[] = []
   const imageMetadata: ImageMetadata[] = []
 
@@ -60,7 +63,7 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
 
     if (!response.ok) {
       return {
-        error: `Failed to fetch URL: ${response.statusText} (${response.status})`,
+        error: t("fetchUrlFailed", { statusText: response.statusText, status: response.status }),
         logs,
       }
     }
@@ -142,7 +145,7 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
 
     if (imageUrls.length === 0) {
       logs.push("No images found on the page")
-      return { error: "No images found on the page", logs }
+      return { error: t("noImages"), logs }
     }
 
     // Create metadata for each image
@@ -160,12 +163,12 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
   } catch (error) {
     if (error instanceof Error && error.message.includes('SSRF Blocked')) {
       logs.push(`Security error: ${error.message}`)
-      return { error: "The provided URL is not allowed for security reasons.", logs }
+      return { error: t("notAllowed"), logs }
     }
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     logs.push(`Error in fetchImagesFromUrl: ${errorMessage}`)
     console.error("Error in fetchImagesFromUrl:", error)
-    return { error: `Failed to fetch images from the URL: ${errorMessage}`, logs }
+    return { error: t("fetchImagesFailed", { message: errorMessage }), logs }
   }
 }
 

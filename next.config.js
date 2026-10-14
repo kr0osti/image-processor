@@ -1,5 +1,6 @@
-// Import the Next.js config from the config directory
-// The actual configuration is in config/next/next.config.js
+// Translations: locale and messages are resolved per request in i18n/request.ts
+const createNextIntlPlugin = require('next-intl/plugin')
+const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -40,4 +41,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+module.exports = withNextIntl(nextConfig)

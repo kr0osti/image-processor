@@ -24,6 +24,7 @@ import {
 import { ImageMetadata } from "./actions"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 import { readSettingsCookie } from "@/lib/settings"
 import {
   BOUNDS_SCAN_SIZE,
@@ -83,6 +84,7 @@ interface ProcessOptions {
 }
 
 export default function ImageProcessor() {
+  const t = useTranslations("Home")
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [url, setUrl] = useState("")
@@ -149,14 +151,14 @@ export default function ImageProcessor() {
         document.body.removeChild(textArea)
 
         if (successful) {
-          toast.success("Full image URL copied to clipboard")
+          toast.success(t("toasts.urlCopied"))
           addLog("Full image URL copied to clipboard (fallback method)")
         } else {
-          toast.error("Failed to copy URL")
+          toast.error(t("toasts.copyFailed"))
           addLog("Failed to copy URL (fallback method failed)")
         }
       } catch (err) {
-        toast.error("Failed to copy URL")
+        toast.error(t("toasts.copyFailed"))
         addLog(`Error copying URL: ${err}`)
       }
       return
@@ -165,11 +167,11 @@ export default function ImageProcessor() {
     // Modern clipboard API
     navigator.clipboard.writeText(absoluteUrl)
       .then(() => {
-        toast.success("Full image URL copied to clipboard")
+        toast.success(t("toasts.urlCopied"))
         addLog("Full image URL copied to clipboard")
       })
       .catch(err => {
-        toast.error("Failed to copy URL")
+        toast.error(t("toasts.copyFailed"))
         addLog(`Error copying URL: ${err}`)
       })
   }
@@ -245,7 +247,7 @@ export default function ImageProcessor() {
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred"
-      setError(`An error occurred while fetching the images: ${errorMessage}`)
+      setError(t("errors.fetchFailed", { message: errorMessage }))
       addLog(`Exception: ${errorMessage}`)
       console.error(err)
     } finally {
@@ -387,14 +389,14 @@ export default function ImageProcessor() {
 
     if (imageFiles.length === 0) {
       addLog('No image files found in dropped files');
-      toast.error('Please drop image files only');
+      toast.error(t('toasts.dropImagesOnly'));
       return;
     }
 
     if (imageFiles.length < allFiles.length) {
       const skippedCount = allFiles.length - imageFiles.length;
       addLog(`Skipped ${skippedCount} non-image file(s)`);
-      toast.info(`Skipped ${skippedCount} non-image file(s)`);
+      toast.info(t('toasts.skippedFiles', { count: skippedCount }));
     }
 
 
@@ -599,11 +601,7 @@ export default function ImageProcessor() {
     addLog(`Completed processing. Successfully processed ${processed.length} of ${urls.length} images`)
     const lowRes = processed.filter((img) => !img.isPlaceholder && isUpscaled(img.upscale)).length
     if (lowRes > 0) {
-      toast.warning(
-        lowRes === 1
-          ? "1 image is smaller than the output and was upscaled. It may look blurry."
-          : `${lowRes} images are smaller than the output and were upscaled. They may look blurry.`,
-      )
+      toast.warning(t("toasts.upscaled", { count: lowRes }))
     }
     // Append to earlier results instead of replacing them
     setProcessedImages((prev) => [...prev, ...processed])
@@ -638,12 +636,12 @@ export default function ImageProcessor() {
           prev.map((img) => (img.id === target.id ? { ...result, id: img.id, version: img.version + 1 } : img)),
         )
       } else {
-        toast.error(`Failed to reprocess image ${index + 1}`)
+        toast.error(t("toasts.reprocessFailed", { index: index + 1 }))
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
       addLog(`Error reprocessing image ${index + 1}: ${errorMessage}`)
-      toast.error(`Failed to reprocess image ${index + 1}`)
+      toast.error(t("toasts.reprocessFailed", { index: index + 1 }))
     } finally {
       setReprocessingIndex(null)
     }
@@ -1061,7 +1059,7 @@ export default function ImageProcessor() {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
       addLog(`Error creating zip file: ${errorMessage}`)
-      setError(`Failed to create zip file: ${errorMessage}`)
+      setError(t("errors.zipFailed", { message: errorMessage }))
     } finally {
       setProcessing(false)
     }
@@ -1097,7 +1095,7 @@ export default function ImageProcessor() {
 
   const processSelectedImages = () => {
     if (selectedImages.length === 0) {
-      setError("Please select at least one image to process")
+      setError(t("errors.selectImage"))
       addLog("No images selected for processing")
       return
     }
@@ -1211,13 +1209,13 @@ export default function ImageProcessor() {
         <section className="mx-auto max-w-2xl text-center">
           <span className="inline-flex items-center gap-1.5 rounded-full border bg-card/70 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            1500 × 1500 px · centered · ready for your shop
+            {t("badge")}
           </span>
           <h1 className="mt-5 text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
-            Image Processor
+            {t("title")}
           </h1>
           <p className="mt-4 text-balance text-base text-muted-foreground sm:text-lg">
-            Download and process images to 1500×1500 px with appropriate positioning. Upload files or pull them straight from a webpage.
+            {t("subtitle")}
           </p>
         </section>
 
@@ -1225,12 +1223,12 @@ export default function ImageProcessor() {
           <Tabs defaultValue="upload">
             <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl p-1">
               <TabsTrigger value="upload" className="gap-2 rounded-lg py-2">
-                <Upload className="h-4 w-4" />
-                Upload Images
+                <Upload className="hidden h-4 w-4 sm:block" />
+                {t("tabs.upload")}
               </TabsTrigger>
               <TabsTrigger value="webpage" className="gap-2 rounded-lg py-2">
-                <Globe className="h-4 w-4" />
-                From Webpage
+                <Globe className="hidden h-4 w-4 sm:block" />
+                {t("tabs.webpage")}
               </TabsTrigger>
             </TabsList>
 
@@ -1250,8 +1248,8 @@ export default function ImageProcessor() {
                 <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-primary/15 to-fuchsia-500/15 text-primary ring-1 ring-primary/20 transition-transform group-hover:scale-105">
                   <Upload className="h-6 w-6" />
                 </div>
-                <p className="text-base font-medium">Drag &amp; drop images here</p>
-                <p className="mt-1 text-sm text-muted-foreground">PNG, JPG, WEBP or GIF · up to 10 MB each</p>
+                <p className="text-base font-medium">{t("upload.dropTitle")}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{t("upload.dropHint")}</p>
                 <Button
                   type="button"
                   className="mt-6 rounded-full px-5 shadow-sm shadow-primary/25"
@@ -1261,7 +1259,7 @@ export default function ImageProcessor() {
                   }}
                 >
                   <Upload className="h-4 w-4" />
-                  Upload Images
+                  {t("upload.button")}
                 </Button>
                 <input
                   type="file"
@@ -1275,14 +1273,14 @@ export default function ImageProcessor() {
 
               <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
                 <Info className="h-3.5 w-3.5" />
-                Uploading works with any image on your device and avoids CORS issues.
+                {t("upload.corsHint")}
               </p>
 
               {uploadedFiles.length > 0 && (
                 <div className="mt-6 animate-fade-in">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <p className="text-sm font-medium">
-                      Uploaded files <span className="text-muted-foreground">({uploadedFiles.length})</span>
+                      {t("upload.uploadedFiles")} <span className="text-muted-foreground">({uploadedFiles.length})</span>
                     </p>
                     <Button
                       variant="ghost"
@@ -1291,7 +1289,7 @@ export default function ImageProcessor() {
                       onClick={deleteAllFiles}
                     >
                       <Trash2 className="h-4 w-4" />
-                      Delete All Files
+                      {t("deleteAll")}
                     </Button>
                   </div>
                   <ul className="flex flex-wrap gap-2">
@@ -1302,7 +1300,7 @@ export default function ImageProcessor() {
                       >
                         <ImageIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         <span className="truncate font-medium">{file.name}</span>
-                        <span className="shrink-0 font-mono text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</span>
+                        <span className="shrink-0 font-mono text-muted-foreground">{t("upload.fileSize", { size: (file.size / 1024).toFixed(1) })}</span>
                       </li>
                     ))}
                   </ul>
@@ -1313,7 +1311,7 @@ export default function ImageProcessor() {
             <TabsContent value="webpage" className="mt-0 p-4 sm:p-6">
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="url">Webpage URL</Label>
+                  <Label htmlFor="url">{t("webpage.urlLabel")}</Label>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <div className="relative flex-1">
                       <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -1331,10 +1329,10 @@ export default function ImageProcessor() {
                       {loading ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Fetching
+                          {t("webpage.fetching")}
                         </>
                       ) : (
-                        "Fetch Images"
+                        t("webpage.fetch")
                       )}
                     </Button>
                   </div>
@@ -1342,12 +1340,12 @@ export default function ImageProcessor() {
 
                 <div className="flex items-center gap-3">
                   <Switch id="use-custom-base" checked={useCustomBaseUrl} onCheckedChange={setUseCustomBaseUrl} />
-                  <Label htmlFor="use-custom-base" className="font-normal">Use custom base URL for relative paths</Label>
+                  <Label htmlFor="use-custom-base" className="font-normal">{t("webpage.customBase")}</Label>
                 </div>
 
                 {useCustomBaseUrl && (
                   <div className="animate-fade-in space-y-2">
-                    <Label htmlFor="base-url">Base URL</Label>
+                    <Label htmlFor="base-url">{t("webpage.baseUrlLabel")}</Label>
                     <Input
                       id="base-url"
                       type="url"
@@ -1361,28 +1359,25 @@ export default function ImageProcessor() {
 
                 <div className="flex gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
                   <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>
-                    Images from websites may be protected by CORS. The app will create placeholders for images that
-                    can&apos;t be loaded directly.
-                  </p>
+                  <p>{t("webpage.corsWarning")}</p>
                 </div>
               </form>
 
               {fetchedImages.length > 0 && (
                 <div className="mt-8 animate-fade-in space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-lg font-semibold tracking-tight">Found Images ({fetchedImages.length})</h2>
+                    <h2 className="text-lg font-semibold tracking-tight">{t("found.title", { count: fetchedImages.length })}</h2>
                     <div className="flex flex-wrap items-center gap-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" className="rounded-full">
                             <Filter className="h-4 w-4" />
-                            Size
+                            {t("found.size")}
                             <ChevronDown className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56 rounded-xl">
-                          <DropdownMenuLabel>Filter by Size</DropdownMenuLabel>
+                          <DropdownMenuLabel>{t("found.filterTitle")}</DropdownMenuLabel>
                           <DropdownMenuSeparator />
 
                           <div className="space-y-2 p-2">
@@ -1393,8 +1388,8 @@ export default function ImageProcessor() {
                                   checked={sizeFilter.includes(size)}
                                   onCheckedChange={() => toggleSizeFilter(size)}
                                 />
-                                <label htmlFor={`size-${size}`} className="flex flex-1 justify-between text-sm capitalize">
-                                  {size}
+                                <label htmlFor={`size-${size}`} className="flex flex-1 justify-between text-sm">
+                                  {t(`found.sizes.${size}`)}
                                   <span className="font-mono text-muted-foreground">{sizeCounts[size]}</span>
                                 </label>
                               </div>
@@ -1411,14 +1406,14 @@ export default function ImageProcessor() {
                                 onCheckedChange={(checked) => setCustomSizeEnabled(!!checked)}
                               />
                               <label htmlFor="custom-size" className="text-sm font-medium">
-                                Custom Size
+                                {t("found.customSize")}
                               </label>
                             </div>
 
                             {customSizeEnabled && (
                               <div className="mt-2 space-y-2">
                                 <div className="flex items-center gap-2">
-                                  <label htmlFor="min-width" className="w-20 text-xs">Min Width:</label>
+                                  <label htmlFor="min-width" className="w-20 text-xs">{t("found.minWidth")}</label>
                                   <Input
                                     id="min-width"
                                     type="number"
@@ -1429,7 +1424,7 @@ export default function ImageProcessor() {
                                   />
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <label htmlFor="min-height" className="w-20 text-xs">Min Height:</label>
+                                  <label htmlFor="min-height" className="w-20 text-xs">{t("found.minHeight")}</label>
                                   <Input
                                     id="min-height"
                                     type="number"
@@ -1446,7 +1441,7 @@ export default function ImageProcessor() {
                       </DropdownMenu>
 
                       <Button variant="outline" size="sm" className="rounded-full" onClick={selectAllImages}>
-                        {selectedImages.length === filteredImages.length ? "Deselect All" : "Select All"}
+                        {selectedImages.length === filteredImages.length ? t("found.deselectAll") : t("found.selectAll")}
                       </Button>
                       <Button
                         variant="ghost"
@@ -1455,7 +1450,7 @@ export default function ImageProcessor() {
                         onClick={deleteAllFiles}
                       >
                         <Trash2 className="h-4 w-4" />
-                        Delete All Files
+                        {t("deleteAll")}
                       </Button>
                       <Button
                         size="sm"
@@ -1463,7 +1458,7 @@ export default function ImageProcessor() {
                         onClick={processSelectedImages}
                         disabled={selectedImages.length === 0}
                       >
-                        Process Selected ({selectedImages.length})
+                        {t("found.processSelected", { count: selectedImages.length })}
                       </Button>
                     </div>
                   </div>
@@ -1486,7 +1481,7 @@ export default function ImageProcessor() {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={getProxiedImageUrl(imgUrl) || "/placeholder.svg"}
-                              alt={`Image ${index + 1}`}
+                              alt={t("found.imageAlt", { index: index + 1 })}
                               className="h-full w-full object-contain p-2 transition-transform group-hover:scale-[1.03]"
                               onError={(e) => {
                                 e.currentTarget.src = "/placeholder.svg?height=150&width=150";
@@ -1539,7 +1534,7 @@ export default function ImageProcessor() {
           <div role="status" className="mt-8 flex justify-center">
             <div className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm shadow-sm">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              Processing images…
+              {t("processing")}
             </div>
           </div>
         )}
@@ -1548,18 +1543,18 @@ export default function ImageProcessor() {
           <section className="mt-12 animate-fade-in">
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="text-2xl font-semibold tracking-tight">Processed Images ({processedImages.length})</h2>
-                <p className="mt-1 text-sm text-muted-foreground">1500 × 1500 px, ready to download.</p>
+                <h2 className="text-2xl font-semibold tracking-tight">{t("processed.title", { count: processedImages.length })}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{t("processed.subtitle")}</p>
               </div>
               {processedImages.length > 1 && (
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={downloadAllImages} size="sm" variant="outline" className="rounded-full">
                     <Download className="h-4 w-4" />
-                    Download Individually
+                    {t("processed.downloadIndividually")}
                   </Button>
                   <Button onClick={downloadAsZip} size="sm" className="rounded-full shadow-sm shadow-primary/25">
                     <Download className="h-4 w-4" />
-                    Download as ZIP
+                    {t("processed.downloadZip")}
                   </Button>
                 </div>
               )}
@@ -1571,7 +1566,7 @@ export default function ImageProcessor() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={img.url ? `${img.url}${img.version ? `${img.url.includes("?") ? "&" : "?"}v=${img.version}` : ""}` : "/placeholder.svg"}
-                      alt={`Processed image ${index + 1}`}
+                      alt={t("processed.imageAlt", { index: index + 1 })}
                       className="h-full w-full object-contain"
                     />
                     {reprocessingIndex === index && (
@@ -1583,7 +1578,7 @@ export default function ImageProcessor() {
                       size="icon"
                       variant="secondary"
                       className="absolute right-2 top-2 h-8 w-8 rounded-full border bg-card/90 shadow-sm backdrop-blur"
-                      aria-label={`Remove image ${index + 1}`}
+                      aria-label={t("processed.remove", { index: index + 1 })}
                       disabled={busy}
                       onClick={() => removeProcessedImage(img.id)}
                     >
@@ -1595,7 +1590,7 @@ export default function ImageProcessor() {
                     {!img.isPlaceholder && isUpscaled(img.upscale) && (
                       <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-amber-400 px-1.5 py-0.5 text-[11px] font-semibold text-amber-950 shadow-sm">
                         <TriangleAlert className="h-3 w-3" />
-                        Low resolution
+                        {t("processed.lowResBadge")}
                       </span>
                     )}
                   </div>
@@ -1606,10 +1601,12 @@ export default function ImageProcessor() {
                     >
                       <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       <p>
-                        Source is only{" "}
-                        <span className="font-mono">{img.sourceWidth}×{img.sourceHeight}</span> px and was upscaled{" "}
-                        <span className="font-mono">{img.upscale.toFixed(1)}×</span>, so it may look blurry. Use a larger
-                        image{img.whiteBackground ? " or increase the padding in Settings" : ""}.
+                        {t.rich(img.whiteBackground ? "processed.lowResNotePadded" : "processed.lowResNote", {
+                          width: img.sourceWidth,
+                          height: img.sourceHeight,
+                          factor: img.upscale.toFixed(1),
+                          mono: (chunks) => <span className="font-mono">{chunks}</span>,
+                        })}
                       </p>
                     </div>
                   )}
@@ -1617,7 +1614,7 @@ export default function ImageProcessor() {
                     <div className="space-y-3 border-t px-4 py-3">
                       <div className="flex items-center justify-between gap-3">
                         <Label htmlFor={`white-bg-${index}`} className="text-sm font-normal">
-                          White background (padded)
+                          {t("processed.whiteBackground")}
                         </Label>
                         <Switch
                           id={`white-bg-${index}`}
@@ -1629,7 +1626,7 @@ export default function ImageProcessor() {
                       {(img.hasWhitePadding || img.trimPadding) && (
                         <div className="flex items-center justify-between gap-3">
                           <Label htmlFor={`trim-padding-${index}`} className="text-sm font-normal">
-                            Trim white padding from source
+                            {t("processed.trimPadding")}
                           </Label>
                           <Switch
                             id={`trim-padding-${index}`}
@@ -1644,11 +1641,11 @@ export default function ImageProcessor() {
                   <div className="flex gap-2 border-t p-3">
                     <Button size="sm" variant="outline" className="flex-1 rounded-lg" onClick={() => copyImageUrl(img.url)}>
                       <Copy className="h-4 w-4" />
-                      Copy URL
+                      {t("processed.copyUrl")}
                     </Button>
                     <Button size="sm" className="flex-1 rounded-lg" onClick={() => downloadImage(img.url, index + 1)}>
                       <Download className="h-4 w-4" />
-                      Download
+                      {t("processed.download")}
                     </Button>
                   </div>
                 </article>
@@ -1658,7 +1655,7 @@ export default function ImageProcessor() {
         )}
 
         <footer className="mt-16 text-center text-xs text-muted-foreground">
-          All images will be processed to 1500×1500 px with appropriate positioning.
+          {t("footer")}
         </footer>
       </div>
     </main>
