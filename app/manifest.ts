@@ -8,8 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
   const themeColor = process.env.NEXT_PUBLIC_SITE_THEME_COLOR || '#000000'
   const backgroundColor = process.env.NEXT_PUBLIC_SITE_BACKGROUND_COLOR || '#ffffff'
   
-  // Check if custom icons directory exists and use those icons if available
-  const iconPath = '/custom-icons'
+  const iconPath = '/icons'
   
   return {
     name: siteName,
@@ -21,23 +20,23 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: themeColor,
     icons: [
       {
-        src: `${iconPath}/icon-192x192.png`,
+        src: `${iconPath}/icon-192.png`,
         sizes: '192x192',
         type: 'image/png',
       },
       {
-        src: `${iconPath}/icon-512x512.png`,
+        src: `${iconPath}/icon-512.png`,
         sizes: '512x512',
         type: 'image/png',
       },
       {
-        src: `${iconPath}/icon-maskable-192x192.png`,
+        src: `${iconPath}/icon-maskable-192.png`,
         sizes: '192x192',
         type: 'image/png',
         purpose: 'maskable'
       },
       {
-        src: `${iconPath}/icon-maskable-512x512.png`,
+        src: `${iconPath}/icon-maskable-512.png`,
         sizes: '512x512',
         type: 'image/png',
         purpose: 'maskable'
