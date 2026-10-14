@@ -61,6 +61,16 @@ const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 // Maximum request body size (allows a 25 MB image as base64 plus JSON overhead)
 const MAX_REQUEST_BYTES = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 64 * 1024;
 
+// Requests still running after this long get a 504 response
+const REQUEST_TIMEOUT_MS = 60 * 1000;
+
+class RequestTimeoutError extends Error {
+  constructor(ms) {
+    super(`Request processing timed out after ${ms / 1000} seconds`);
+    this.name = 'RequestTimeoutError';
+  }
+}
+
 // Create a rate limiter for the images endpoint
 // Allow 300 requests per minute per IP address
 const rateLimiter = createRateLimiter({
@@ -82,7 +92,7 @@ const rateLimiter = createRateLimiter({
  * @param {Request} request - The incoming HTTP request
  * @returns {Promise<NextResponse>} JSON response with processing results
  * @throws {Error} If image processing fails
- * @timeout 60 seconds - The request will be terminated if it takes longer than 60 seconds
+ * @timeout 60 seconds - Requests still running after 60 seconds get a 504 response
  */
 export async function POST(request) {
   // Check rate limit before processing the request
@@ -92,233 +102,22 @@ export async function POST(request) {
   }
 
   /**
-   * Set up a timeout mechanism for the request processing
-   * This prevents the request from hanging indefinitely and consuming server resources
-   * The timeout is set to 60 seconds, after which the request will be aborted
+   * Race the handler against a timer so a request that hangs gets a 504
+   * instead of tying up the client. JavaScript can't cancel the handler, so
+   * it may still finish in the background; its result is then ignored.
    */
   let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      console.error('Request processing timed out after 60 seconds');
-      reject(new Error('Request processing timed out after 60 seconds'));
-    }, 60000);
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new RequestTimeoutError(REQUEST_TIMEOUT_MS)), REQUEST_TIMEOUT_MS);
   });
 
   try {
-    const contentType = request.headers.get('content-type') || '';
-
-    // Reject oversized requests before reading the body
-    const contentLength = Number(request.headers.get('content-length'));
-    if (contentLength > MAX_REQUEST_BYTES) {
-      if (timeoutId) clearTimeout(timeoutId);
-
-      return NextResponse.json({
-        success: false,
-        message: 'Request too large'
-      }, { status: 413 });
-    }
-
-    // Handle JSON request (dataUrl)
-    if (contentType.includes('application/json')) {
-      const body = await request.json();
-      const { dataUrl, originalFilename } = body;
-
-      if (!dataUrl || typeof dataUrl !== 'string') {
-        // Clear the timeout since we're about to return
-        if (timeoutId) clearTimeout(timeoutId);
-
-        return NextResponse.json({
-          success: false,
-          message: 'No data URL provided'
-        }, { status: 400 });
-      }
-
-      /**
-       * Log the size of the received data URL for debugging and monitoring
-       * This helps identify potential issues with large payloads
-       * Size is converted from bytes to kilobytes for readability
-       */
-
-      // Extract the base64 data from the data URL
-      const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-
-      if (!matches || matches.length !== 3 || !ALLOWED_IMAGE_TYPES[matches[1].toLowerCase()]) {
-        // Clear the timeout since we're about to return
-        if (timeoutId) clearTimeout(timeoutId);
-
-        return NextResponse.json({
-          success: false,
-          message: 'Invalid data URL format'
-        }, { status: 400 });
-      }
-
-      if (matches[2].length > Math.ceil(MAX_IMAGE_BYTES * 4 / 3)) {
-        if (timeoutId) clearTimeout(timeoutId);
-
-        return NextResponse.json({
-          success: false,
-          message: 'Image too large'
-        }, { status: 413 });
-      }
-
-      const uploadsDir = await ensureUploadsDir();
-      const fileExt = ALLOWED_IMAGE_TYPES[matches[1].toLowerCase()];
-
-      // Generate filename based on original filename if provided
-      let filename;
-      if (typeof originalFilename === 'string' && originalFilename) {
-        // Sanitize the filename (no leading dots) and append -processed before the extension
-        const sanitized = originalFilename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '');
-        const nameWithoutExt = sanitized.replace(/\.[^/.]+$/, '').slice(0, 200) || 'image';
-        filename = `${nameWithoutExt}-processed.${fileExt}`;
-      } else {
-        // Fallback to random filename if no original filename provided
-        filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
-      }
-      
-      const filePath = path.join(uploadsDir, filename);
-
-      try {
-        // Convert base64 to buffer and save to file
-        const buffer = Buffer.from(matches[2], 'base64');
-        await writeFile(filePath, buffer);
-
-
-        // Verify file exists after saving
-        if (existsSync(filePath)) {
-        } else {
-          console.error(`File was not found after saving: ${filePath}`);
-        }
-
-        // The URL should be relative to the public directory
-        const publicUrl = `/uploads/${filename}`;
-        const apiUrl = `/api/serve-image?file=${filename}`;
-
-        // After saving the file
-
-        // Clear the timeout since we're about to return successfully
-        if (timeoutId) clearTimeout(timeoutId);
-
-        return NextResponse.json({
-          success: true,
-          message: 'Image saved successfully',
-          url: publicUrl,
-          apiUrl: apiUrl
-        });
-      } catch (writeError) {
-        console.error(`Error writing file: ${writeError.message}`);
-
-        // Clear the timeout since we're about to return
-        if (timeoutId) clearTimeout(timeoutId);
-
-        return NextResponse.json({
-          success: false,
-          message: 'Failed to save image'
-        }, { status: 500 });
-      }
-    }
-    // Handle form data
-    else if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
-      const formData = await request.formData();
-
-      // Extract image data from the request
-      const imageUrls = formData.getAll('imageUrls');
-      const files = formData.getAll('files');
-      const webUrl = formData.get('webUrl');
-
-      // Process the images (placeholder implementation)
-      const processedImages = [];
-
-      if (imageUrls && imageUrls.length > 0) {
-        // Process image URLs
-        for (const url of imageUrls) {
-          if (url) {
-            processedImages.push({
-              originalUrl: url,
-              processedUrl: url,
-              success: true
-            });
-          }
-        }
-      }
-
-      if (files && files.length > 0) {
-        console.log(`Processing ${files.length} uploaded files`);
-        // Ensure the uploads directory exists once before processing all files
-        const uploadsDir = await ensureUploadsDir();
-
-        // Process uploaded files concurrently
-        const filePromises = files.map(async (file) => {
-          if (!file || typeof file !== 'object') return null;
-
-          // Only accept allowed image types within the size limit
-          const fileExt = ALLOWED_IMAGE_TYPES[(file.type || '').toLowerCase()];
-          if (!fileExt || file.size > MAX_IMAGE_BYTES) {
-            return {
-              originalName: file.name,
-              processedUrl: null,
-              success: false,
-              message: !fileExt ? 'Unsupported file type' : 'File too large'
-            };
-          }
-
-          // Save the file to the uploads directory
-          const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
-          const filePath = path.join(uploadsDir, filename);
-          const publicUrl = `/uploads/${filename}`;
-
-          // Get file data as ArrayBuffer and save it
-          const fileData = await file.arrayBuffer();
-          await writeFile(filePath, Buffer.from(fileData));
-
-          return {
-            originalName: file.name,
-            processedUrl: publicUrl,
-            success: true
-          };
-        });
-
-        const results = await Promise.all(filePromises);
-        processedImages.push(...results.filter(Boolean));
-      }
-
-      if (webUrl) {
-        processedImages.push({
-          originalUrl: webUrl,
-          processedUrl: null,
-          success: false,
-          message: 'Web scraping implementation pending'
-        });
-      }
-
-      // Clear the timeout since we're about to return successfully
-      if (timeoutId) clearTimeout(timeoutId);
-
-      return NextResponse.json({
-        success: true,
-        message: 'Images processed successfully',
-        images: processedImages
-      });
-    }
-    // Handle unsupported content type
-    else {
-      // Clear the timeout since we're about to return
-      if (timeoutId) clearTimeout(timeoutId);
-
-      return NextResponse.json({
-        success: false,
-        message: 'Unsupported content type',
-        error: `Content type '${contentType}' is not supported. Use 'application/json' or 'multipart/form-data'.`
-      }, { status: 400 });
-    }
+    return await Promise.race([handleRequest(request), timeout]);
   } catch (error) {
-    // Clear the timeout to prevent memory leaks
-    if (timeoutId) clearTimeout(timeoutId);
-
     console.error('Error processing images:', error);
 
     // Check if this is a timeout error
-    if (error.message.includes('timed out')) {
+    if (error instanceof RequestTimeoutError) {
       return NextResponse.json(
         {
           success: false,
@@ -337,5 +136,203 @@ export async function POST(request) {
       },
       { status: 500 }
     );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Handles a POST request once it has passed the rate limiter.
+ *
+ * @param {Request} request - The incoming HTTP request
+ * @returns {Promise<NextResponse>} JSON response with processing results
+ */
+async function handleRequest(request) {
+  const contentType = request.headers.get('content-type') || '';
+
+  // Reject oversized requests before reading the body
+  const contentLength = Number(request.headers.get('content-length'));
+  if (contentLength > MAX_REQUEST_BYTES) {
+    return NextResponse.json({
+      success: false,
+      message: 'Request too large'
+    }, { status: 413 });
+  }
+
+  // Handle JSON request (dataUrl)
+  if (contentType.includes('application/json')) {
+    const body = await request.json();
+    const { dataUrl, originalFilename } = body;
+
+    if (!dataUrl || typeof dataUrl !== 'string') {
+      return NextResponse.json({
+        success: false,
+        message: 'No data URL provided'
+      }, { status: 400 });
+    }
+
+    /**
+     * Log the size of the received data URL for debugging and monitoring
+     * This helps identify potential issues with large payloads
+     * Size is converted from bytes to kilobytes for readability
+     */
+
+    // Extract the base64 data from the data URL
+    const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+
+    if (!matches || matches.length !== 3 || !ALLOWED_IMAGE_TYPES[matches[1].toLowerCase()]) {
+      return NextResponse.json({
+        success: false,
+        message: 'Invalid data URL format'
+      }, { status: 400 });
+    }
+
+    if (matches[2].length > Math.ceil(MAX_IMAGE_BYTES * 4 / 3)) {
+      return NextResponse.json({
+        success: false,
+        message: 'Image too large'
+      }, { status: 413 });
+    }
+
+    const uploadsDir = await ensureUploadsDir();
+    const fileExt = ALLOWED_IMAGE_TYPES[matches[1].toLowerCase()];
+
+    // Generate filename based on original filename if provided
+    let filename;
+    if (typeof originalFilename === 'string' && originalFilename) {
+      // Sanitize the filename (no leading dots) and append -processed before the extension
+      const sanitized = originalFilename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '');
+      const nameWithoutExt = sanitized.replace(/\.[^/.]+$/, '').slice(0, 200) || 'image';
+      filename = `${nameWithoutExt}-processed.${fileExt}`;
+    } else {
+      // Fallback to random filename if no original filename provided
+      filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
+    }
+    
+    const filePath = path.join(uploadsDir, filename);
+
+    try {
+      // Convert base64 to buffer and save to file
+      const buffer = Buffer.from(matches[2], 'base64');
+      await writeFile(filePath, buffer);
+
+
+      // Verify file exists after saving
+      if (existsSync(filePath)) {
+      } else {
+        console.error(`File was not found after saving: ${filePath}`);
+      }
+
+      // The URL should be relative to the public directory
+      const publicUrl = `/uploads/${filename}`;
+      const apiUrl = `/api/serve-image?file=${filename}`;
+
+      // After saving the file
+
+
+      return NextResponse.json({
+        success: true,
+        message: 'Image saved successfully',
+        url: publicUrl,
+        apiUrl: apiUrl
+      });
+    } catch (writeError) {
+      console.error(`Error writing file: ${writeError.message}`);
+
+
+      return NextResponse.json({
+        success: false,
+        message: 'Failed to save image'
+      }, { status: 500 });
+    }
+  }
+  // Handle form data
+  else if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
+    const formData = await request.formData();
+
+    // Extract image data from the request
+    const imageUrls = formData.getAll('imageUrls');
+    const files = formData.getAll('files');
+    const webUrl = formData.get('webUrl');
+
+    // Process the images (placeholder implementation)
+    const processedImages = [];
+
+    if (imageUrls && imageUrls.length > 0) {
+      // Process image URLs
+      for (const url of imageUrls) {
+        if (url) {
+          processedImages.push({
+            originalUrl: url,
+            processedUrl: url,
+            success: true
+          });
+        }
+      }
+    }
+
+    if (files && files.length > 0) {
+      console.log(`Processing ${files.length} uploaded files`);
+      // Ensure the uploads directory exists once before processing all files
+      const uploadsDir = await ensureUploadsDir();
+
+      // Process uploaded files concurrently
+      const filePromises = files.map(async (file) => {
+        if (!file || typeof file !== 'object') return null;
+
+        // Only accept allowed image types within the size limit
+        const fileExt = ALLOWED_IMAGE_TYPES[(file.type || '').toLowerCase()];
+        if (!fileExt || file.size > MAX_IMAGE_BYTES) {
+          return {
+            originalName: file.name,
+            processedUrl: null,
+            success: false,
+            message: !fileExt ? 'Unsupported file type' : 'File too large'
+          };
+        }
+
+        // Save the file to the uploads directory
+        const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
+        const filePath = path.join(uploadsDir, filename);
+        const publicUrl = `/uploads/${filename}`;
+
+        // Get file data as ArrayBuffer and save it
+        const fileData = await file.arrayBuffer();
+        await writeFile(filePath, Buffer.from(fileData));
+
+        return {
+          originalName: file.name,
+          processedUrl: publicUrl,
+          success: true
+        };
+      });
+
+      const results = await Promise.all(filePromises);
+      processedImages.push(...results.filter(Boolean));
+    }
+
+    if (webUrl) {
+      processedImages.push({
+        originalUrl: webUrl,
+        processedUrl: null,
+        success: false,
+        message: 'Web scraping implementation pending'
+      });
+    }
+
+
+    return NextResponse.json({
+      success: true,
+      message: 'Images processed successfully',
+      images: processedImages
+    });
+  }
+  // Handle unsupported content type
+  else {
+    return NextResponse.json({
+      success: false,
+      message: 'Unsupported content type',
+      error: `Content type '${contentType}' is not supported. Use 'application/json' or 'multipart/form-data'.`
+    }, { status: 400 });
   }
 }
