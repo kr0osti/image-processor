@@ -150,8 +150,8 @@ jobs:
 
       - name: Create test directories
         run: |
-          mkdir -p test-custom-icons test-uploads
-          chmod 755 test-custom-icons test-uploads
+          mkdir -p test-uploads
+          chmod 755 test-uploads
 
       - name: Test docker-compose with permissions
         run: |
@@ -170,7 +170,6 @@ jobs:
                 - NEXT_PUBLIC_SITE_URL=http://localhost:3000
                 - CLEANUP_API_KEY=test-key
               volumes:
-                - ../test-custom-icons:/app/public/custom-icons
                 - ../test-uploads:/app/public/uploads
               ports:
                 - "3001:3000"
@@ -213,6 +212,6 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          rm -rf test-custom-icons test-uploads
+          rm -rf test-uploads
           docker compose -f docker/docker-compose-test.yml down || true
           docker image rm ghcr.io/${{ github.repository }}/nextjs-app:test || true
