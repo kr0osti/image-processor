@@ -74,6 +74,15 @@ interface ProcessedImage {
   sourceWidth: number;
   sourceHeight: number;
   upscale: number;
+  // Server-side name of the saved file and the token that allows deleting it
+  filename: string | null;
+  deleteToken: string | null;
+}
+
+interface SavedImage {
+  url: string;
+  filename: string | null;
+  deleteToken: string | null;
 }
 
 interface ProcessOptions {
@@ -474,7 +483,7 @@ export default function ImageProcessor() {
    * @param {string} [originalFilename] - Optional original filename to use for the processed file
    * @returns {Promise<string|null>} A promise that resolves to the URL of the saved image, or null if an error occurred
    */
-  const convertDataUrlToRealUrl = async (dataUrl: string, originalFilename?: string): Promise<string | null> => {
+  const convertDataUrlToRealUrl = async (dataUrl: string, originalFilename?: string): Promise<SavedImage | null> => {
     try {
       // Create an AbortController to handle timeouts
       const controller = new AbortController();
@@ -503,7 +512,7 @@ export default function ImageProcessor() {
       if (data.success) {
         // Return the API URL which should work more reliably
         addLog(`Image successfully saved to server`)
-        return data.apiUrl || data.url;
+        return { url: data.apiUrl || data.url, filename: data.filename ?? null, deleteToken: data.deleteToken ?? null };
       } else {
         throw new Error(data.message || 'Failed to save image');
       }
@@ -559,12 +568,12 @@ export default function ImageProcessor() {
     const originalFilename = imageUrlToFilename.current.get(imageUrl)
 
     // Convert data URL to real URL
-    const realUrl = await convertDataUrlToRealUrl(compressedImage, originalFilename)
-    if (realUrl === null) return null
+    const saved = await convertDataUrlToRealUrl(compressedImage, originalFilename)
+    if (saved === null) return null
 
     return {
       id: nextImageId.current++,
-      url: realUrl,
+      url: saved.url,
       sourceUrl: imageUrl,
       whiteBackground: result?.whiteBackground ?? false,
       hasWhitePadding: result?.hasWhitePadding ?? false,
@@ -574,6 +583,8 @@ export default function ImageProcessor() {
       sourceWidth: result?.sourceWidth ?? 0,
       sourceHeight: result?.sourceHeight ?? 0,
       upscale: result?.upscale ?? 1,
+      filename: saved.filename,
+      deleteToken: saved.deleteToken,
     }
   }
 
@@ -1080,17 +1091,43 @@ export default function ImageProcessor() {
     addLog(`Removed processed image: ${target.url}`)
   }
 
-  const deleteAllFiles = () => {
+  const deleteAllFiles = async () => {
+    // Files this session saved on the server, with the tokens that prove it
+    const files = processedImages.flatMap((img) =>
+      img.filename && img.deleteToken ? [{ filename: img.filename, token: img.deleteToken }] : [],
+    )
+
     // Clean up object URLs
     revokeBlobUrls(uploadedFiles.map((upload) => upload.url))
 
-    // Reset all file-related state
+    // Reset all file-related state right away; the server delete runs in the background
     setUploadedFiles([])
     setProcessedImages([])
     setFetchedImages([])
     setSelectedImages([])
 
-    addLog("All files deleted")
+    if (files.length === 0) {
+      addLog("All files cleared")
+      return
+    }
+
+    try {
+      const response = await fetch('/api/images', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || data.rejected > 0) {
+        throw new Error(data.message || `Server responded with ${response.status}`)
+      }
+      addLog(`Deleted ${data.deleted} files from the server (${data.missing} already gone)`)
+      toast.success(t("toasts.filesDeleted", { count: data.deleted + data.missing }))
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      addLog(`Error deleting files from the server: ${errorMessage}`)
+      toast.warning(t("toasts.deleteFailed"))
+    }
   }
 
   const processSelectedImages = () => {

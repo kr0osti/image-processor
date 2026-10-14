@@ -75,6 +75,7 @@ Customize the application by setting these environment variables in your `.env` 
 | `CLEANUP_API_KEY` | API key for `/api/cleanup` (**required**: the endpoint returns 500 when it is unset) | (none) |
 | `CLEANUP_CRON_SCHEDULE` | Cron schedule for the cleanup job; files older than one interval are deleted | */30 * * * * |
 | `NEXT_PUBLIC_DEBUG` | Enable debug logging | false |
+| `UPLOAD_TOKEN_SECRET` | Key for signing delete tokens. Optional; without it a random key is used, so tokens issued before a restart stop working (those files are still removed by the cleanup job) | (random per start) |
 | `ALLOWED_DEV_ORIGINS` | Comma-separated hosts allowed to open `next dev` from another machine (e.g. a LAN IP) | (none) |
 
 ### Translations
@@ -116,7 +117,8 @@ A single Next.js application:
 
 | Endpoint | Method | Description | Rate Limit |
 |----------|--------|-------------|------------|
-| `/api/images` | POST | Save a processed image | 300 req/min |
+| `/api/images` | POST | Save a processed image; returns its `filename` and a `deleteToken` | 300 req/min |
+| `/api/images` | DELETE | Delete saved images: `{ files: [{ filename, token }] }`, each with the token returned when it was saved | 30 req/min |
 | `/api/proxy` | GET | Proxy for fetching images to avoid CORS issues | 500 req/min |
 | `/api/serve-image` | GET | Serve processed images from the server | — |
 | `/api/cleanup` | GET | Delete uploads older than `maxAge` minutes (default 60); requires `?key=<CLEANUP_API_KEY>` | 5 req/min |

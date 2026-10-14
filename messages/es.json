@@ -79,7 +79,9 @@
       "dropImagesOnly": "Suelta solo archivos de imagen",
       "skippedFiles": "{count, plural, one {Se omitió # archivo que no es una imagen} other {Se omitieron # archivos que no son imágenes}}",
       "upscaled": "{count, plural, one {# imagen es más pequeña que la salida y se amplió. Puede verse borrosa.} other {# imágenes son más pequeñas que la salida y se ampliaron. Pueden verse borrosas.}}",
-      "reprocessFailed": "No se pudo volver a procesar la imagen {index}"
+      "reprocessFailed": "No se pudo volver a procesar la imagen {index}",
+      "filesDeleted": "{count, plural, one {Se eliminó # archivo del servidor} other {Se eliminaron # archivos del servidor}}",
+      "deleteFailed": "No se pudieron eliminar todos los archivos del servidor. El resto se eliminará en la limpieza programada."
     },
     "errors": {
       "fetchFailed": "Se produjo un error al obtener las imágenes: {message}",

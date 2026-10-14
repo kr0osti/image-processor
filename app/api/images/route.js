@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { existsSync } from 'fs';
 import { cleanupOldUploads } from '../../utils/cleanup';
 import { createRateLimiter } from '../../utils/rate-limit.js';
+import { createDeleteToken, isValidDeleteToken } from '../../utils/delete-token.js';
 
 // Run cleanup on server start (will run when this file is first imported)
 (async () => {
@@ -234,7 +235,10 @@ async function handleRequest(request) {
         success: true,
         message: 'Image saved successfully',
         url: publicUrl,
-        apiUrl: apiUrl
+        apiUrl: apiUrl,
+        filename,
+        // Lets this client delete the file again (see DELETE below)
+        deleteToken: createDeleteToken(filename)
       });
     } catch (writeError) {
       console.error(`Error writing file: ${writeError.message}`);
@@ -335,4 +339,80 @@ async function handleRequest(request) {
       error: `Content type '${contentType}' is not supported. Use 'application/json' or 'multipart/form-data'.`
     }, { status: 400 });
   }
+}
+
+// Most files a single DELETE request may remove
+const MAX_DELETE_FILES = 500;
+
+// Plain filenames only: no paths, no hidden files
+const SAFE_FILENAME = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+
+const deleteRateLimiter = createRateLimiter({
+  limit: 30,
+  windowMs: 60 * 1000, // 1 minute
+  message: 'Too many delete requests. Please try again later.',
+  name: 'images-delete'
+});
+
+/**
+ * Deletes processed images the client saved earlier.
+ *
+ * Body: { files: [{ filename, token }] }, where each token is the deleteToken
+ * returned when the file was saved. Files with an invalid token or name are
+ * skipped and reported as rejected; files that are already gone count as missing.
+ *
+ * @param {Request} request - The incoming HTTP request
+ * @returns {Promise<NextResponse>} JSON with deleted, missing and rejected counts
+ */
+export async function DELETE(request) {
+  const rateLimitResponse = await deleteRateLimiter(request);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
+  let files;
+  try {
+    ({ files } = await request.json());
+  } catch {
+    return NextResponse.json({ success: false, message: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  if (!Array.isArray(files) || files.length > MAX_DELETE_FILES) {
+    return NextResponse.json(
+      { success: false, message: `Expected "files" to be an array of at most ${MAX_DELETE_FILES} entries` },
+      { status: 400 }
+    );
+  }
+
+  const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+  let deleted = 0;
+  let missing = 0;
+  let rejected = 0;
+
+  for (const entry of files) {
+    const filename = entry?.filename;
+    if (
+      typeof filename !== 'string' ||
+      !SAFE_FILENAME.test(filename) ||
+      path.basename(filename) !== filename ||
+      !isValidDeleteToken(filename, entry?.token)
+    ) {
+      rejected++;
+      continue;
+    }
+
+    try {
+      await unlink(path.join(uploadsDir, filename));
+      deleted++;
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        missing++;
+      } else {
+        console.error(`Error deleting ${filename}:`, error);
+        rejected++;
+      }
+    }
+  }
+
+  return NextResponse.json({ success: rejected === 0, deleted, missing, rejected });
 }

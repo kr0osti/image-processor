@@ -127,9 +127,14 @@ test.describe('Processed image toggles', () => {
     await page.locator('#white-bg-0').click();
     await expect(page.locator('#white-bg-0')).toBeChecked({ timeout: 30_000 });
 
-    // Delete All clears everything
+    // Delete All clears the page and deletes the saved file on the server
+    const remainingSrc = await page.getByAltText('Processed image 1').getAttribute('src');
+    expect((await page.request.get(remainingSrc!)).status()).toBe(200);
+
     await page.getByRole('button', { name: 'Delete All Files' }).click();
     await expect(page.getByRole('heading', { name: /Processed Images/ })).toHaveCount(0);
     await expect(uploads).toHaveCount(0);
+    await expect(page.getByText('Deleted 1 file from the server')).toBeVisible();
+    expect((await page.request.get(remainingSrc!)).status()).toBe(404);
   });
 });

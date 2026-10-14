@@ -79,7 +79,9 @@
       "dropImagesOnly": "Please drop image files only",
       "skippedFiles": "Skipped {count, plural, one {# non-image file} other {# non-image files}}",
       "upscaled": "{count, plural, one {# image is smaller than the output and was upscaled. It may look blurry.} other {# images are smaller than the output and were upscaled. They may look blurry.}}",
-      "reprocessFailed": "Failed to reprocess image {index}"
+      "reprocessFailed": "Failed to reprocess image {index}",
+      "filesDeleted": "{count, plural, one {Deleted # file from the server} other {Deleted # files from the server}}",
+      "deleteFailed": "Couldn't delete every file from the server. The rest will be removed by the scheduled cleanup."
     },
     "errors": {
       "fetchFailed": "An error occurred while fetching the images: {message}",

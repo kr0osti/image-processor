@@ -1,5 +1,6 @@
 import { POST } from '../../app/api/images/route';
-import { jest } from '@jest/globals';
+// Use the global `jest`: next/jest's SWC transform only hoists jest.mock() above
+// the imports for the global, so importing it from @jest/globals leaves mocks unapplied.
 
 // Mock the dependencies
 jest.mock('../../app/utils/rate-limit.js', () => ({
@@ -76,31 +77,20 @@ describe('Images API', () => {
   });
 
   it('should handle file write errors', async () => {
-    // Save the original implementation
-    const originalWriteFile = require('fs/promises').writeFile;
-
-    // Mock writeFile to throw an error after the first successful call
+    // The writability probe in ensureUploadsDir succeeds; saving the image itself fails
     let callCount = 0;
-    require('fs/promises').writeFile.mockImplementation((...args) => {
+    require('fs/promises').writeFile.mockImplementation(() => {
       callCount++;
-      if (callCount <= 1) {
-        // Let the first call succeed (for the test file)
-        return originalWriteFile(...args);
-      }
-      // Make subsequent calls fail
-      throw new Error('Write error');
+      return callCount === 1 ? Promise.resolve() : Promise.reject(new Error('Write error'));
     });
 
     const validDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-    const req = createMockRequest({ dataUrl: validDataUrl });
-
-    const response = await POST(req);
+    const response = await POST(createMockRequest({ dataUrl: validDataUrl }));
     const data = await response.json();
 
-    // Since we're letting the first call succeed, the test will pass with a 200 status
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.message).toBe('Image saved successfully');
+    expect(response.status).toBe(500);
+    expect(data.success).toBe(false);
+    expect(data.message).toBe('Failed to save image');
   });
 
   it('should handle directory creation errors', async () => {

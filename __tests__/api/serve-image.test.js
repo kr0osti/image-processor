@@ -1,12 +1,17 @@
 const fs = require('fs');
 const path = require('path');
+const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
 beforeAll(() => {
-  const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
   fs.writeFileSync(path.join(uploadsDir, 'test.png'), 'test');
   fs.writeFileSync(path.join(uploadsDir, 'test.jpg'), 'test');
+});
+// Remove the fixtures so test runs leave public/uploads as they found it
+afterAll(() => {
+  fs.rmSync(path.join(uploadsDir, 'test.png'), { force: true });
+  fs.rmSync(path.join(uploadsDir, 'test.jpg'), { force: true });
 });
 if (typeof Request === "undefined") { global.Request = class Request {}; }
 /**
