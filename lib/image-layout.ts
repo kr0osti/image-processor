@@ -3,7 +3,7 @@
 
 export const OUTPUT_SIZE = 1500
 // Padding applied on each side when the white-background layout is used
-export const WHITE_BACKGROUND_PADDING = 300
+export const WHITE_BACKGROUND_PADDING = 150
 // Share of sampled pixels that must be white for the image to count as white-background
 export const WHITE_RATIO_THRESHOLD = 0.85
 // Padding counts as significant when trimming it would remove at least this share of the width or height

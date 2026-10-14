@@ -146,16 +146,16 @@ describe('getSampleRegions', () => {
 
 describe('computeDrawRect', () => {
   describe('with white background', () => {
-    it('fits a square image into the padded 900px area', () => {
-      expect(computeDrawRect(500, 500, true)).toEqual({ x: 300, y: 300, width: 900, height: 900 })
+    it('fits a square image into the padded 1200px area', () => {
+      expect(computeDrawRect(500, 500, true)).toEqual({ x: 150, y: 150, width: 1200, height: 1200 })
     })
 
     it('fits a landscape image by its width and centers it', () => {
-      expect(computeDrawRect(2000, 1000, true)).toEqual({ x: 300, y: 525, width: 900, height: 450 })
+      expect(computeDrawRect(2000, 1000, true)).toEqual({ x: 150, y: 450, width: 1200, height: 600 })
     })
 
     it('fits a portrait image by its height and centers it', () => {
-      expect(computeDrawRect(1000, 2000, true)).toEqual({ x: 525, y: 300, width: 450, height: 900 })
+      expect(computeDrawRect(1000, 2000, true)).toEqual({ x: 450, y: 150, width: 600, height: 1200 })
     })
   })
 
@@ -200,13 +200,13 @@ describe('computeDrawRect with a custom padding', () => {
 describe('getUpscaleFactor / isUpscaled', () => {
   it('reports how much a small source is enlarged', () => {
     const rect = computeDrawRect(500, 500, true)
-    expect(getUpscaleFactor(500, 500, rect)).toBeCloseTo(1.8)
+    expect(getUpscaleFactor(500, 500, rect)).toBeCloseTo(2.4)
     expect(isUpscaled(getUpscaleFactor(500, 500, rect))).toBe(true)
   })
 
   it('does not flag sources that are scaled down or kept at size', () => {
     expect(isUpscaled(getUpscaleFactor(3000, 2000, computeDrawRect(3000, 2000, false)))).toBe(false)
     expect(isUpscaled(getUpscaleFactor(1500, 1500, computeDrawRect(1500, 1500, false)))).toBe(false)
-    expect(isUpscaled(getUpscaleFactor(900, 900, computeDrawRect(900, 900, true)))).toBe(false)
+    expect(isUpscaled(getUpscaleFactor(1200, 1200, computeDrawRect(1200, 1200, true)))).toBe(false)
   })
 })

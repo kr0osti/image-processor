@@ -22,7 +22,7 @@ test.describe('Settings', () => {
     await expect(page.getByLabel('White detection threshold', { exact: true })).toHaveValue('70');
 
     await page.getByRole('button', { name: 'Reset to defaults' }).click();
-    await expect(page.getByLabel('Padding', { exact: true })).toHaveValue('300');
+    await expect(page.getByLabel('Padding', { exact: true })).toHaveValue('150');
     await expect(page.getByLabel('White detection threshold', { exact: true })).toHaveValue('85');
   });
 
@@ -64,9 +64,9 @@ test.describe('Low-resolution warning', () => {
 
     await expect(page.getByRole('heading', { name: 'Processed Images (1)' })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText('Low resolution')).toBeVisible();
-    // 200px fitted into the default 900px content area
+    // 200px fitted into the default 1200px content area (150px padding per side)
     await expect(page.getByRole('note')).toContainText('200×200');
-    await expect(page.getByRole('note')).toContainText('4.5×');
+    await expect(page.getByRole('note')).toContainText('6.0×');
   });
 
   test('does not flag large images', async ({ page }) => {
