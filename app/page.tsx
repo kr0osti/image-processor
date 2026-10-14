@@ -8,13 +8,11 @@ const isBrowser = typeof window !== 'undefined';
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { fetchImagesFromUrl } from "./actions"
-import { Loader2, Globe, Upload, AlertTriangle, Download, Trash2, Filter, ChevronDown, X } from "lucide-react"
+import { Loader2, Globe, Upload, TriangleAlert, CircleAlert, Download, Trash2, Filter, ChevronDown, X, Check, Info, Sparkles, ImageIcon, Link2, Copy } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import JSZip from "jszip"
 import {
   DropdownMenu,
@@ -25,7 +23,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ImageMetadata } from "./actions"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Copy } from "lucide-react"
 import { toast } from "sonner"
 import {
   BOUNDS_SCAN_SIZE,
@@ -1155,150 +1152,215 @@ export default function ImageProcessor() {
     )
   }
 
+  const busy = processing || reprocessingIndex !== null
+  const metaFor = (imgUrl: string) => imageMetadata.find(m => m.url === imgUrl)
+
   return (
-    <div className="container mx-auto py-10">
-      <Card className="max-w-4xl mx-auto">
-        <CardHeader>
-          <h1 className="text-2xl font-bold">Image Processor</h1>
-          <CardDescription>Download and proccess images to 1500x1500px with appropriate positioning</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <main className="relative isolate">
+      {/* Decorative backdrop: soft glow + fading dot grid */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px] overflow-hidden">
+        <div className="absolute left-1/2 top-[-220px] h-[460px] w-[900px] -translate-x-1/2 rounded-full bg-gradient-to-r from-primary/25 via-fuchsia-500/15 to-sky-400/20 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(hsl(var(--foreground)/0.07)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+      </div>
+
+      <div className="mx-auto max-w-5xl px-4 pb-20 pt-12 sm:px-6 sm:pt-16">
+        <section className="mx-auto max-w-2xl text-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full border bg-card/70 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            1500 × 1500 px · centered · ready for your shop
+          </span>
+          <h1 className="mt-5 text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
+            Image Processor
+          </h1>
+          <p className="mt-4 text-balance text-base text-muted-foreground sm:text-lg">
+            Download and process images to 1500×1500 px with appropriate positioning. Upload files or pull them straight from a webpage.
+          </p>
+        </section>
+
+        <div className="mt-10 rounded-2xl border bg-card/80 p-1.5 shadow-xl shadow-black/[0.04] backdrop-blur-sm dark:shadow-black/40">
           <Tabs defaultValue="upload">
-            <TabsList className="mb-4">
-              <TabsTrigger value="upload">
-                <Upload className="mr-2 h-4 w-4" />
+            <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl p-1">
+              <TabsTrigger value="upload" className="gap-2 rounded-lg py-2">
+                <Upload className="h-4 w-4" />
                 Upload Images
               </TabsTrigger>
-              <TabsTrigger value="webpage">
-                <Globe className="mr-2 h-4 w-4" />
+              <TabsTrigger value="webpage" className="gap-2 rounded-lg py-2">
+                <Globe className="h-4 w-4" />
                 From Webpage
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="webpage">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <Alert>
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  <AlertDescription>
-                    Images from websites may be protected by CORS. The app will create placeholders for images that
-                    can&apos;t be loaded directly.
-                  </AlertDescription>
-                </Alert>
+            <TabsContent value="upload" className="mt-0 p-4 sm:p-6">
+              <div
+                className={`group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-14 text-center transition-colors ${
+                  isDragging
+                    ? 'border-primary bg-accent'
+                    : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                }`}
+                onClick={triggerFileInput}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-primary/15 to-fuchsia-500/15 text-primary ring-1 ring-primary/20 transition-transform group-hover:scale-105">
+                  <Upload className="h-6 w-6" />
+                </div>
+                <p className="text-base font-medium">Drag &amp; drop images here</p>
+                <p className="mt-1 text-sm text-muted-foreground">PNG, JPG, WEBP or GIF · up to 10 MB each</p>
+                <Button
+                  type="button"
+                  className="mt-6 rounded-full px-5 shadow-sm shadow-primary/25"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    triggerFileInput()
+                  }}
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload Images
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileUpload}
+                />
+              </div>
 
+              <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                <Info className="h-3.5 w-3.5" />
+                Uploading works with any image on your device and avoids CORS issues.
+              </p>
+
+              {uploadedFiles.length > 0 && (
+                <div className="mt-6 animate-fade-in">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">
+                      Uploaded files <span className="text-muted-foreground">({uploadedFiles.length})</span>
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={deleteAllFiles}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete All Files
+                    </Button>
+                  </div>
+                  <ul className="flex flex-wrap gap-2">
+                    {uploadedFiles.map(({ file, url }) => (
+                      <li
+                        key={url}
+                        className="inline-flex max-w-full items-center gap-2 rounded-full border bg-muted/50 py-1 pl-2 pr-3 text-xs"
+                      >
+                        <ImageIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="truncate font-medium">{file.name}</span>
+                        <span className="shrink-0 font-mono text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="webpage" className="mt-0 p-4 sm:p-6">
+              <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="url">Webpage URL</Label>
-                  <Input
-                    id="url"
-                    type="url"
-                    placeholder="https://example.com"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    required
-                  />
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <div className="relative flex-1">
+                      <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="url"
+                        type="url"
+                        placeholder="https://example.com/product"
+                        className="h-11 rounded-lg pl-9"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" disabled={loading} className="h-11 rounded-lg px-5 shadow-sm shadow-primary/25">
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Fetching
+                        </>
+                      ) : (
+                        "Fetch Images"
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-3">
                   <Switch id="use-custom-base" checked={useCustomBaseUrl} onCheckedChange={setUseCustomBaseUrl} />
-                  <Label htmlFor="use-custom-base">Use custom base URL for relative paths</Label>
+                  <Label htmlFor="use-custom-base" className="font-normal">Use custom base URL for relative paths</Label>
                 </div>
 
                 {useCustomBaseUrl && (
-                  <div className="space-y-2">
+                  <div className="animate-fade-in space-y-2">
                     <Label htmlFor="base-url">Base URL</Label>
                     <Input
                       id="base-url"
                       type="url"
                       placeholder="https://example.com"
+                      className="h-11 rounded-lg"
                       value={baseUrl}
                       onChange={(e) => setBaseUrl(e.target.value)}
                     />
                   </div>
                 )}
 
-                <Button type="submit" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Fetching
-                    </>
-                  ) : (
-                    "Fetch Images"
-                  )}
-                </Button>
+                <div className="flex gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>
+                    Images from websites may be protected by CORS. The app will create placeholders for images that
+                    can&apos;t be loaded directly.
+                  </p>
+                </div>
               </form>
 
               {fetchedImages.length > 0 && (
-                <div className="mt-4 flex justify-end">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={deleteAllFiles}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete All Files
-                  </Button>
-                </div>
-              )}
-
-              {fetchedImages.length > 0 && (
-                <div className="mt-6 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium">Found Images ({fetchedImages.length})</h3>
-                    <div className="flex space-x-2 items-center">
-                      {/* Add Size Filter Dropdown */}
+                <div className="mt-8 animate-fade-in space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-lg font-semibold tracking-tight">Found Images ({fetchedImages.length})</h2>
+                    <div className="flex flex-wrap items-center gap-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="flex items-center gap-1">
+                          <Button variant="outline" size="sm" className="rounded-full">
                             <Filter className="h-4 w-4" />
                             Size
                             <ChevronDown className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuContent align="end" className="w-56 rounded-xl">
                           <DropdownMenuLabel>Filter by Size</DropdownMenuLabel>
                           <DropdownMenuSeparator />
 
-                          {/* Preset size filters */}
-                          <div className="p-2">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <Checkbox
-                                id="size-small"
-                                checked={sizeFilter.includes('small')}
-                                onCheckedChange={() => toggleSizeFilter('small')}
-                              />
-                              <label htmlFor="size-small" className="text-sm">
-                                Small ({sizeCounts.small})
-                              </label>
-                            </div>
-
-                            <div className="flex items-center space-x-2 mb-2">
-                              <Checkbox
-                                id="size-medium"
-                                checked={sizeFilter.includes('medium')}
-                                onCheckedChange={() => toggleSizeFilter('medium')}
-                              />
-                              <label htmlFor="size-medium" className="text-sm">
-                                Medium ({sizeCounts.medium})
-                              </label>
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id="size-large"
-                                checked={sizeFilter.includes('large')}
-                                onCheckedChange={() => toggleSizeFilter('large')}
-                              />
-                              <label htmlFor="size-large" className="text-sm">
-                                Large ({sizeCounts.large})
-                              </label>
-                            </div>
+                          <div className="space-y-2 p-2">
+                            {(['small', 'medium', 'large'] as const).map((size) => (
+                              <div key={size} className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`size-${size}`}
+                                  checked={sizeFilter.includes(size)}
+                                  onCheckedChange={() => toggleSizeFilter(size)}
+                                />
+                                <label htmlFor={`size-${size}`} className="flex flex-1 justify-between text-sm capitalize">
+                                  {size}
+                                  <span className="font-mono text-muted-foreground">{sizeCounts[size]}</span>
+                                </label>
+                              </div>
+                            ))}
                           </div>
 
                           <DropdownMenuSeparator />
 
-                          {/* Custom size filter */}
                           <div className="p-2">
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center gap-2">
                               <Checkbox
                                 id="custom-size"
                                 checked={customSizeEnabled}
@@ -1311,24 +1373,24 @@ export default function ImageProcessor() {
 
                             {customSizeEnabled && (
                               <div className="mt-2 space-y-2">
-                                <div className="flex items-center space-x-2">
-                                  <label htmlFor="min-width" className="text-xs w-20">Min Width:</label>
+                                <div className="flex items-center gap-2">
+                                  <label htmlFor="min-width" className="w-20 text-xs">Min Width:</label>
                                   <Input
                                     id="min-width"
                                     type="number"
                                     placeholder="px"
-                                    className="h-7 text-xs"
+                                    className="h-8 text-xs"
                                     value={minWidth || ''}
                                     onChange={(e) => setMinWidth(e.target.value ? Number(e.target.value) : undefined)}
                                   />
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                  <label htmlFor="min-height" className="text-xs w-20">Min Height:</label>
+                                <div className="flex items-center gap-2">
+                                  <label htmlFor="min-height" className="w-20 text-xs">Min Height:</label>
                                   <Input
                                     id="min-height"
                                     type="number"
                                     placeholder="px"
-                                    className="h-7 text-xs"
+                                    className="h-8 text-xs"
                                     value={minHeight || ''}
                                     onChange={(e) => setMinHeight(e.target.value ? Number(e.target.value) : undefined)}
                                   />
@@ -1339,239 +1401,202 @@ export default function ImageProcessor() {
                         </DropdownMenuContent>
                       </DropdownMenu>
 
-                      <Button variant="outline" size="sm" onClick={selectAllImages}>
+                      <Button variant="outline" size="sm" className="rounded-full" onClick={selectAllImages}>
                         {selectedImages.length === filteredImages.length ? "Deselect All" : "Select All"}
                       </Button>
-                      <Button onClick={processSelectedImages} disabled={selectedImages.length === 0}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={deleteAllFiles}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete All Files
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="rounded-full shadow-sm shadow-primary/25"
+                        onClick={processSelectedImages}
+                        disabled={selectedImages.length === 0}
+                      >
                         Process Selected ({selectedImages.length})
                       </Button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {/* Update to use filteredImages instead of fetchedImages */}
-                    {filteredImages.map((imgUrl, index) => (
-                      <div
-                        key={index}
-                        className={`border rounded-lg overflow-hidden cursor-pointer transition-all ${
-                          selectedImages.includes(imgUrl) ? "ring-2 ring-primary" : ""
-                        }`}
-                        onClick={() => toggleImageSelection(imgUrl)}
-                      >
-                        <div className="relative h-[150px] w-full bg-gray-100">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={getProxiedImageUrl(imgUrl) || "/placeholder.svg"}
-                            alt={`Image ${index + 1}`}
-                            className="object-contain w-full h-full"
-                            onError={(e) => {
-                              e.currentTarget.src = "/placeholder.svg?height=150&width=150";
-                            }}
-                          />
-                          {/* Add size badge */}
-                          {imageMetadata.find(m => m.url === imgUrl)?.size && (
-                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                              {imageMetadata.find(m => m.url === imgUrl)?.size}
-                              {imageMetadata.find(m => m.url === imgUrl)?.width && imageMetadata.find(m => m.url === imgUrl)?.height &&
-                                ` (${imageMetadata.find(m => m.url === imgUrl)?.width}×${imageMetadata.find(m => m.url === imgUrl)?.height})`
-                              }
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-2 text-xs truncate">
-                          {imageMetadata.find(m => m.url === imgUrl)?.filename || imgUrl.split('/').pop() || 'image'}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {filteredImages.map((imgUrl, index) => {
+                      const meta = metaFor(imgUrl)
+                      const selected = selectedImages.includes(imgUrl)
+                      return (
+                        <button
+                          type="button"
+                          key={index}
+                          aria-pressed={selected}
+                          className={`group overflow-hidden rounded-xl border bg-card text-left transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                            selected ? "border-primary ring-2 ring-primary" : ""
+                          }`}
+                          onClick={() => toggleImageSelection(imgUrl)}
+                        >
+                          <div className="relative aspect-square w-full bg-checkerboard">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={getProxiedImageUrl(imgUrl) || "/placeholder.svg"}
+                              alt={`Image ${index + 1}`}
+                              className="h-full w-full object-contain p-2 transition-transform group-hover:scale-[1.03]"
+                              onError={(e) => {
+                                e.currentTarget.src = "/placeholder.svg?height=150&width=150";
+                              }}
+                            />
+                            <span
+                              aria-hidden="true"
+                              className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full border shadow-sm transition-colors ${
+                                selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card/90 text-transparent"
+                              }`}
+                            >
+                              <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                            </span>
+                            {meta?.size && (
+                              <span className="absolute bottom-2 right-2 rounded-md bg-black/75 px-1.5 py-0.5 font-mono text-[11px] text-white backdrop-blur">
+                                {meta.size}
+                                {meta.width && meta.height && ` · ${meta.width}×${meta.height}`}
+                              </span>
+                            )}
+                          </div>
+                          <div className="truncate border-t px-3 py-2 text-xs text-muted-foreground">
+                            {meta?.filename || imgUrl.split('/').pop() || 'image'}
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
             </TabsContent>
-
-            <TabsContent value="upload">
-              <div className="space-y-4">
-                <Alert>
-                  <AlertDescription>
-                    Upload your images directly to avoid CORS issues. This method works with any image file on your
-                    device.
-                  </AlertDescription>
-                </Alert>
-
-                <div
-                  className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 cursor-pointer transition-colors ${
-                    isDragging 
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
-                      : 'border-border hover:bg-muted'
-                  }`}
-                  onClick={triggerFileInput}
-                  onDragOver={handleDragOver}
-                  onDragEnter={handleDragEnter}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <Upload className="h-8 w-8 mb-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mb-1">Click to upload or drag and drop</p>
-                  <p className="text-xs text-muted-foreground">PNG, JPG, WEBP, GIF up to 10MB</p>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept="image/*"
-                    multiple
-                    onChange={handleFileUpload}
-                  />
-                </div>
-
-                <Button
-                  onClick={triggerFileInput}
-                  className="mt-4"
-                  role="button"
-                  aria-label="Upload Images"
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Images
-                </Button>
-
-                {uploadedFiles.length > 0 && (
-                  <div className="mt-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm font-medium">Uploaded files:</p>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={deleteAllFiles}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete All Files
-                      </Button>
-                    </div>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      {uploadedFiles.map(({ file, url }) => (
-                        <li key={url}>
-                          {file.name} ({(file.size / 1024).toFixed(2)} KB)
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
           </Tabs>
+        </div>
 
-          {error && <p className="text-red-500 mt-4">{error}</p>}
+        {error && (
+          <div role="alert" className="mt-6 flex gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive dark:text-red-300">
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{error}</p>
+          </div>
+        )}
 
-          {/* Hidden canvas for image processing */}
-          <canvas
-            ref={canvasRef}
-            width={1500}
-            height={1500}
-            style={{ display: 'none' }}
-          />
+        {/* Hidden canvas for image processing */}
+        <canvas
+          ref={canvasRef}
+          width={1500}
+          height={1500}
+          style={{ display: 'none' }}
+        />
 
-          {/* Logs panel */}
-          {/* Removed logs panel section */}
-
-          {processing && (
-            <div className="flex items-center justify-center mt-6">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="ml-2">Processing images...</p>
+        {processing && (
+          <div role="status" className="mt-8 flex justify-center">
+            <div className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm shadow-sm">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              Processing images…
             </div>
-          )}
+          </div>
+        )}
 
-          {processedImages.length > 0 && (
-            <div className="mt-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Processed Images ({processedImages.length})</h3>
-                {processedImages.length > 1 && (
-                  <div className="flex space-x-2">
-                    <Button onClick={downloadAllImages} size="sm" variant="outline">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Individually
-                    </Button>
-                    <Button onClick={downloadAsZip} size="sm">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download as ZIP
-                    </Button>
-                  </div>
-                )}
+        {processedImages.length > 0 && (
+          <section className="mt-12 animate-fade-in">
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight">Processed Images ({processedImages.length})</h2>
+                <p className="mt-1 text-sm text-muted-foreground">1500 × 1500 px, ready to download.</p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {processedImages.map((img, index) => (
-                  <div key={img.id} className="border rounded-lg overflow-hidden">
-                    <div className="relative h-[300px] w-full bg-gray-100">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={img.url ? `${img.url}${img.version ? `${img.url.includes("?") ? "&" : "?"}v=${img.version}` : ""}` : "/placeholder.svg"}
-                        alt={`Processed image ${index + 1}`}
-                        className="object-contain w-full h-full"
-                      />
-                      {reprocessingIndex === index && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-white/60">
-                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        </div>
-                      )}
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="absolute top-2 right-2 h-8 w-8"
-                        aria-label={`Remove image ${index + 1}`}
-                        disabled={processing || reprocessingIndex !== null}
-                        onClick={() => removeProcessedImage(img.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {!img.isPlaceholder && (
-                      <div className="px-3 pt-3 space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            id={`white-bg-${index}`}
-                            checked={img.whiteBackground}
-                            disabled={processing || reprocessingIndex !== null}
-                            onCheckedChange={(checked) => reprocessImage(index, { whiteBackground: checked })}
-                          />
-                          <Label htmlFor={`white-bg-${index}`} className="text-sm">
-                            White background (padded)
-                          </Label>
-                        </div>
-                        {(img.hasWhitePadding || img.trimPadding) && (
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              id={`trim-padding-${index}`}
-                              checked={img.trimPadding}
-                              disabled={processing || reprocessingIndex !== null}
-                              onCheckedChange={(checked) => reprocessImage(index, { trimPadding: checked })}
-                            />
-                            <Label htmlFor={`trim-padding-${index}`} className="text-sm">
-                              Trim white padding from source
-                            </Label>
-                          </div>
-                        )}
+              {processedImages.length > 1 && (
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={downloadAllImages} size="sm" variant="outline" className="rounded-full">
+                    <Download className="h-4 w-4" />
+                    Download Individually
+                  </Button>
+                  <Button onClick={downloadAsZip} size="sm" className="rounded-full shadow-sm shadow-primary/25">
+                    <Download className="h-4 w-4" />
+                    Download as ZIP
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {processedImages.map((img, index) => (
+                <article key={img.id} className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-lg">
+                  <div className="relative aspect-square w-full bg-checkerboard">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img.url ? `${img.url}${img.version ? `${img.url.includes("?") ? "&" : "?"}v=${img.version}` : ""}` : "/placeholder.svg"}
+                      alt={`Processed image ${index + 1}`}
+                      className="h-full w-full object-contain"
+                    />
+                    {reprocessingIndex === index && (
+                      <div className="absolute inset-0 grid place-items-center bg-background/60 backdrop-blur-sm">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       </div>
                     )}
-                    <div className="p-3 flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Image {index + 1}</span>
-                      <div className="flex space-x-2">
-                        <Button size="sm" variant="outline" onClick={() => copyImageUrl(img.url)}>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy URL
-                        </Button>
-                        <Button size="sm" onClick={() => downloadImage(img.url, index + 1)}>
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </Button>
-                      </div>
-                    </div>
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="absolute right-2 top-2 h-8 w-8 rounded-full border bg-card/90 shadow-sm backdrop-blur"
+                      aria-label={`Remove image ${index + 1}`}
+                      disabled={busy}
+                      onClick={() => removeProcessedImage(img.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <span className="absolute bottom-2 left-2 rounded-md bg-black/75 px-1.5 py-0.5 font-mono text-[11px] text-white backdrop-blur">
+                      #{index + 1}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  {!img.isPlaceholder && (
+                    <div className="space-y-3 border-t px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor={`white-bg-${index}`} className="text-sm font-normal">
+                          White background (padded)
+                        </Label>
+                        <Switch
+                          id={`white-bg-${index}`}
+                          checked={img.whiteBackground}
+                          disabled={busy}
+                          onCheckedChange={(checked) => reprocessImage(index, { whiteBackground: checked })}
+                        />
+                      </div>
+                      {(img.hasWhitePadding || img.trimPadding) && (
+                        <div className="flex items-center justify-between gap-3">
+                          <Label htmlFor={`trim-padding-${index}`} className="text-sm font-normal">
+                            Trim white padding from source
+                          </Label>
+                          <Switch
+                            id={`trim-padding-${index}`}
+                            checked={img.trimPadding}
+                            disabled={busy}
+                            onCheckedChange={(checked) => reprocessImage(index, { trimPadding: checked })}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex gap-2 border-t p-3">
+                    <Button size="sm" variant="outline" className="flex-1 rounded-lg" onClick={() => copyImageUrl(img.url)}>
+                      <Copy className="h-4 w-4" />
+                      Copy URL
+                    </Button>
+                    <Button size="sm" className="flex-1 rounded-lg" onClick={() => downloadImage(img.url, index + 1)}>
+                      <Download className="h-4 w-4" />
+                      Download
+                    </Button>
+                  </div>
+                </article>
+              ))}
             </div>
-          )}
-        </CardContent>
-        <CardFooter className="text-sm text-muted-foreground">
-          All images will be processed to 1500x1500px with appropriate positioning
-        </CardFooter>
-      </Card>
-    </div>
+          </section>
+        )}
+
+        <footer className="mt-16 text-center text-xs text-muted-foreground">
+          All images will be processed to 1500×1500 px with appropriate positioning.
+        </footer>
+      </div>
+    </main>
   )
 }

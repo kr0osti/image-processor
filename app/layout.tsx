@@ -1,17 +1,18 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
+import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { DebugInfo } from "@/components/debug-info"
+import { SiteHeader } from "@/components/site-header"
+import { Toaster } from "@/components/toaster"
 
-const inter = Inter({ subsets: ["latin"] })
+const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" })
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" })
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   themeColor: process.env.NEXT_PUBLIC_SITE_THEME_COLOR || '#000000',
 }
 
@@ -44,16 +45,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+      <body className="min-h-dvh">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <SiteHeader />
           {children}
+          <Toaster />
           <DebugInfo />
         </ThemeProvider>
       </body>
     </html>
   )
 }
-
-
-import './globals.css'
