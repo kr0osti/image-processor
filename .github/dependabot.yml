@@ -7,6 +7,14 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     versioning-strategy: increase
+    # React and React DOM must always be on the exact same version
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
