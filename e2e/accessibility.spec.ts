@@ -31,6 +31,12 @@ test.describe('Accessibility', () => {
     await expectNoBlockingViolations(page);
   });
 
+  test('settings page has no serious WCAG violations', async ({ page }) => {
+    await page.goto('/settings');
+    await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
+    await expectNoBlockingViolations(page);
+  });
+
   test('dark mode has no serious WCAG violations', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('/');

@@ -1,0 +1,112 @@
+{
+  "Metadata": {
+    "description": "Download and process images to 1500×1500 px with appropriate positioning",
+    "settingsTitle": "Settings"
+  },
+  "Header": {
+    "home": "Home",
+    "settings": "Settings",
+    "language": "Language",
+    "theme": {
+      "label": "Theme: {current}. Switch to {next}",
+      "system": "system",
+      "light": "light",
+      "dark": "dark"
+    }
+  },
+  "Home": {
+    "badge": "1500 × 1500 px · centered · ready for your shop",
+    "title": "Image Processor",
+    "subtitle": "Download and process images to 1500×1500 px with appropriate positioning. Upload files or pull them straight from a webpage.",
+    "footer": "All images will be processed to 1500×1500 px with appropriate positioning.",
+    "tabs": {
+      "upload": "Upload Images",
+      "webpage": "From Webpage"
+    },
+    "upload": {
+      "dropTitle": "Drag & drop images here",
+      "dropHint": "PNG, JPG, WEBP or GIF · up to 10 MB each",
+      "button": "Upload Images",
+      "corsHint": "Uploading works with any image on your device and avoids CORS issues.",
+      "uploadedFiles": "Uploaded files",
+      "fileSize": "{size} KB"
+    },
+    "webpage": {
+      "urlLabel": "Webpage URL",
+      "fetch": "Fetch Images",
+      "fetching": "Fetching",
+      "customBase": "Use custom base URL for relative paths",
+      "baseUrlLabel": "Base URL",
+      "corsWarning": "Images from websites may be protected by CORS. The app will create placeholders for images that can't be loaded directly."
+    },
+    "found": {
+      "title": "Found Images ({count})",
+      "size": "Size",
+      "filterTitle": "Filter by Size",
+      "sizes": {
+        "small": "Small",
+        "medium": "Medium",
+        "large": "Large"
+      },
+      "customSize": "Custom Size",
+      "minWidth": "Min Width:",
+      "minHeight": "Min Height:",
+      "selectAll": "Select All",
+      "deselectAll": "Deselect All",
+      "processSelected": "Process Selected ({count})",
+      "imageAlt": "Image {index}"
+    },
+    "deleteAll": "Delete All Files",
+    "processing": "Processing images…",
+    "processed": {
+      "title": "Processed Images ({count})",
+      "subtitle": "1500 × 1500 px, ready to download.",
+      "downloadIndividually": "Download Individually",
+      "downloadZip": "Download as ZIP",
+      "imageAlt": "Processed image {index}",
+      "remove": "Remove image {index}",
+      "whiteBackground": "White background (padded)",
+      "trimPadding": "Trim white padding from source",
+      "copyUrl": "Copy URL",
+      "download": "Download",
+      "lowResBadge": "Low resolution",
+      "lowResNote": "Source is only <mono>{width}×{height}</mono> px and was upscaled <mono>{factor}×</mono>, so it may look blurry. Use a larger image.",
+      "lowResNotePadded": "Source is only <mono>{width}×{height}</mono> px and was upscaled <mono>{factor}×</mono>, so it may look blurry. Use a larger image or increase the padding in Settings."
+    },
+    "toasts": {
+      "urlCopied": "Full image URL copied to clipboard",
+      "copyFailed": "Failed to copy URL",
+      "dropImagesOnly": "Please drop image files only",
+      "skippedFiles": "Skipped {count, plural, one {# non-image file} other {# non-image files}}",
+      "upscaled": "{count, plural, one {# image is smaller than the output and was upscaled. It may look blurry.} other {# images are smaller than the output and were upscaled. They may look blurry.}}",
+      "reprocessFailed": "Failed to reprocess image {index}"
+    },
+    "errors": {
+      "fetchFailed": "An error occurred while fetching the images: {message}",
+      "zipFailed": "Failed to create zip file: {message}",
+      "selectImage": "Please select at least one image to process"
+    }
+  },
+  "Actions": {
+    "fetchUrlFailed": "Failed to fetch URL: {statusText} ({status})",
+    "noImages": "No images found on the page",
+    "notAllowed": "The provided URL is not allowed for security reasons.",
+    "fetchImagesFailed": "Failed to fetch images from the URL: {message}"
+  },
+  "Settings": {
+    "back": "Back to the processor",
+    "title": "Settings",
+    "intro": "Tune how images are laid out. Settings are saved in a cookie on this device and apply to the next images you process.",
+    "whiteBackgroundSection": "White-background images",
+    "padding": "Padding",
+    "paddingDescription": "Space added on each side of the {size}px canvas. The product is fitted into the remaining <mono>{content}×{content}</mono> px.",
+    "previewCaption": "Content area preview",
+    "detectionSection": "Background detection",
+    "threshold": "White detection threshold",
+    "thresholdDescription": "Share of the sampled edge and center pixels that must be white for an image to get the padded white-background layout. Lower it if product shots on white aren't detected; raise it if photos are padded by mistake.",
+    "slider": "{label} slider",
+    "reset": "Reset to defaults",
+    "save": "Save settings",
+    "saved": "Settings saved"
+  }
+}

@@ -12,9 +12,7 @@ on:
       - 'jest.config.js'
       - 'config/jest/**'
       - 'eslint.config.mjs'
-      - 'config/typescript/**'
       - 'config/playwright/**'
-      - '**/__mocks__/**'
   pull_request:
     branches: [ main ]
     paths-ignore:
@@ -25,9 +23,7 @@ on:
       - 'jest.config.js'
       - 'config/jest/**'
       - 'eslint.config.mjs'
-      - 'config/typescript/**'
       - 'config/playwright/**'
-      - '**/__mocks__/**'
 
 jobs:
   build:
@@ -55,9 +51,7 @@ jobs:
               - '!jest.*.js'
               - '!config/jest/**'
               - '!eslint.config.mjs'
-              - '!config/typescript/**'
               - '!config/playwright/**'
-              - '!**/__mocks__/**'
               - '**'
 
       - name: Output build decision

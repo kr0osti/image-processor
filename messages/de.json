@@ -1,0 +1,112 @@
+{
+  "Metadata": {
+    "description": "Bilder herunterladen und auf 1500×1500 px mit passender Positionierung bearbeiten",
+    "settingsTitle": "Einstellungen"
+  },
+  "Header": {
+    "home": "Startseite",
+    "settings": "Einstellungen",
+    "language": "Sprache",
+    "theme": {
+      "label": "Design: {current}. Wechseln zu {next}",
+      "system": "System",
+      "light": "hell",
+      "dark": "dunkel"
+    }
+  },
+  "Home": {
+    "badge": "1500 × 1500 px · zentriert · bereit für Ihren Shop",
+    "title": "Bildbearbeitung",
+    "subtitle": "Bilder herunterladen und auf 1500×1500 px mit passender Positionierung bearbeiten. Laden Sie Dateien hoch oder holen Sie sie direkt von einer Webseite.",
+    "footer": "Alle Bilder werden auf 1500×1500 px mit passender Positionierung bearbeitet.",
+    "tabs": {
+      "upload": "Bilder hochladen",
+      "webpage": "Von einer Webseite"
+    },
+    "upload": {
+      "dropTitle": "Bilder hierher ziehen und ablegen",
+      "dropHint": "PNG, JPG, WEBP oder GIF · bis zu 10 MB pro Datei",
+      "button": "Bilder hochladen",
+      "corsHint": "Hochladen funktioniert mit jedem Bild auf Ihrem Gerät und vermeidet CORS-Probleme.",
+      "uploadedFiles": "Hochgeladene Dateien",
+      "fileSize": "{size} KB"
+    },
+    "webpage": {
+      "urlLabel": "URL der Webseite",
+      "fetch": "Bilder abrufen",
+      "fetching": "Wird abgerufen",
+      "customBase": "Eigene Basis-URL für relative Pfade verwenden",
+      "baseUrlLabel": "Basis-URL",
+      "corsWarning": "Bilder von Websites können durch CORS geschützt sein. Für Bilder, die nicht direkt geladen werden können, erstellt die App Platzhalter."
+    },
+    "found": {
+      "title": "Gefundene Bilder ({count})",
+      "size": "Größe",
+      "filterTitle": "Nach Größe filtern",
+      "sizes": {
+        "small": "Klein",
+        "medium": "Mittel",
+        "large": "Groß"
+      },
+      "customSize": "Eigene Größe",
+      "minWidth": "Min. Breite:",
+      "minHeight": "Min. Höhe:",
+      "selectAll": "Alle auswählen",
+      "deselectAll": "Auswahl aufheben",
+      "processSelected": "Auswahl bearbeiten ({count})",
+      "imageAlt": "Bild {index}"
+    },
+    "deleteAll": "Alle Dateien löschen",
+    "processing": "Bilder werden bearbeitet…",
+    "processed": {
+      "title": "Bearbeitete Bilder ({count})",
+      "subtitle": "1500 × 1500 px, bereit zum Herunterladen.",
+      "downloadIndividually": "Einzeln herunterladen",
+      "downloadZip": "Als ZIP herunterladen",
+      "imageAlt": "Bearbeitetes Bild {index}",
+      "remove": "Bild {index} entfernen",
+      "whiteBackground": "Weißer Hintergrund (mit Rand)",
+      "trimPadding": "Weißen Rand des Originals entfernen",
+      "copyUrl": "URL kopieren",
+      "download": "Herunterladen",
+      "lowResBadge": "Niedrige Auflösung",
+      "lowResNote": "Das Original ist nur <mono>{width}×{height}</mono> px groß und wurde <mono>{factor}×</mono> vergrößert, daher kann es unscharf wirken. Verwenden Sie ein größeres Bild.",
+      "lowResNotePadded": "Das Original ist nur <mono>{width}×{height}</mono> px groß und wurde <mono>{factor}×</mono> vergrößert, daher kann es unscharf wirken. Verwenden Sie ein größeres Bild oder erhöhen Sie den Rand in den Einstellungen."
+    },
+    "toasts": {
+      "urlCopied": "Vollständige Bild-URL in die Zwischenablage kopiert",
+      "copyFailed": "URL konnte nicht kopiert werden",
+      "dropImagesOnly": "Bitte nur Bilddateien ablegen",
+      "skippedFiles": "{count, plural, one {# Datei übersprungen (kein Bild)} other {# Dateien übersprungen (keine Bilder)}}",
+      "upscaled": "{count, plural, one {# Bild ist kleiner als das Ausgabeformat und wurde vergrößert. Es kann unscharf wirken.} other {# Bilder sind kleiner als das Ausgabeformat und wurden vergrößert. Sie können unscharf wirken.}}",
+      "reprocessFailed": "Bild {index} konnte nicht erneut bearbeitet werden"
+    },
+    "errors": {
+      "fetchFailed": "Beim Abrufen der Bilder ist ein Fehler aufgetreten: {message}",
+      "zipFailed": "ZIP-Datei konnte nicht erstellt werden: {message}",
+      "selectImage": "Bitte wählen Sie mindestens ein Bild zum Bearbeiten aus"
+    }
+  },
+  "Actions": {
+    "fetchUrlFailed": "URL konnte nicht geladen werden: {statusText} ({status})",
+    "noImages": "Auf der Seite wurden keine Bilder gefunden",
+    "notAllowed": "Die angegebene URL ist aus Sicherheitsgründen nicht zulässig.",
+    "fetchImagesFailed": "Bilder konnten nicht von der URL abgerufen werden: {message}"
+  },
+  "Settings": {
+    "back": "Zurück zur Bildbearbeitung",
+    "title": "Einstellungen",
+    "intro": "Legen Sie fest, wie Bilder angeordnet werden. Die Einstellungen werden in einem Cookie auf diesem Gerät gespeichert und gelten für die nächsten bearbeiteten Bilder.",
+    "whiteBackgroundSection": "Bilder mit weißem Hintergrund",
+    "padding": "Rand",
+    "paddingDescription": "Abstand, der auf jeder Seite der {size}-px-Fläche hinzugefügt wird. Das Produkt wird in die verbleibenden <mono>{content}×{content}</mono> px eingepasst.",
+    "previewCaption": "Vorschau des Inhaltsbereichs",
+    "detectionSection": "Hintergrunderkennung",
+    "threshold": "Schwellenwert für Weißerkennung",
+    "thresholdDescription": "Anteil der geprüften Rand- und Mittelpixel, die weiß sein müssen, damit ein Bild das Layout mit weißem Hintergrund und Rand erhält. Senken Sie ihn, wenn Produktfotos auf Weiß nicht erkannt werden; erhöhen Sie ihn, wenn Fotos fälschlich einen Rand erhalten.",
+    "slider": "Schieberegler {label}",
+    "reset": "Auf Standardwerte zurücksetzen",
+    "save": "Einstellungen speichern",
+    "saved": "Einstellungen gespeichert"
+  }
+}
