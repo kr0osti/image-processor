@@ -82,6 +82,14 @@ export default function ImageProcessor() {
   const [isDragging, setIsDragging] = useState(false)
   const [imageUrlToFilename, setImageUrlToFilename] = useState<Map<string, string>>(new Map())
 
+  const addLog = (message: string) => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      // Check if DEBUG is enabled - add more explicit logging to debug the issue
+      console.log(`Debug setting: ${process.env.NEXT_PUBLIC_DEBUG}`)
+      console.log(`[${new Date().toLocaleTimeString()}] ${message}`)
+    }
+  }
+
   // Add this function to copy image URL to clipboard
   const copyImageUrl = (dataUrl: string) => {
     if (!isBrowser) {
@@ -161,14 +169,6 @@ export default function ImageProcessor() {
       processImages(imageUrls)
     }
   }, [imageUrls])
-
-  const addLog = (message: string) => {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      // Check if DEBUG is enabled - add more explicit logging to debug the issue
-      console.log(`Debug setting: ${process.env.NEXT_PUBLIC_DEBUG}`)
-      console.log(`[${new Date().toLocaleTimeString()}] ${message}`)
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1260,7 +1260,7 @@ export default function ImageProcessor() {
                   <AlertTriangle className="h-4 w-4 mr-2" />
                   <AlertDescription>
                     Images from websites may be protected by CORS. The app will create placeholders for images that
-                    can't be loaded directly.
+                    can&apos;t be loaded directly.
                   </AlertDescription>
                 </Alert>
 
