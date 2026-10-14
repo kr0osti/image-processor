@@ -1,12 +1,19 @@
-import { isSafeUrl, safeFetch } from '../../lib/ssrf';
+/**
+ * @jest-environment node
+ */
+import { isSafeUrl, safeFetch, safeLookup } from '../../lib/ssrf';
 import dns from 'dns';
+import { fetch as undiciFetch } from 'undici';
 
 jest.mock('dns', () => ({
   lookup: jest.fn(),
 }));
 
-// Mock global fetch
-global.fetch = jest.fn();
+// safeFetch uses undici's fetch with a pinned-DNS agent
+jest.mock('undici', () => ({
+  Agent: jest.fn(),
+  fetch: jest.fn(),
+}));
 
 describe('isSafeUrl', () => {
   const originalEnv = process.env;
@@ -88,14 +95,14 @@ describe('safeFetch', () => {
     (dns.lookup as unknown as jest.Mock).mockImplementation((hostname, options, callback) => {
       callback(null, [{ address: '93.184.216.34' }]);
     });
-    (global.fetch as jest.Mock).mockResolvedValue({
+    (undiciFetch as jest.Mock).mockResolvedValue({
       status: 200,
       ok: true
     });
 
     const response = await safeFetch('https://example.com');
     expect(response.status).toBe(200);
-    expect(global.fetch).toHaveBeenCalledWith('https://example.com', expect.objectContaining({ redirect: 'manual' }));
+    expect(undiciFetch).toHaveBeenCalledWith('https://example.com', expect.objectContaining({ redirect: 'manual' }));
   });
 
   it('should block unsafe initial URLs', async () => {
@@ -111,7 +118,7 @@ describe('safeFetch', () => {
       callback(null, [{ address: '93.184.216.34' }]);
     });
 
-    (global.fetch as jest.Mock)
+    (undiciFetch as jest.Mock)
       .mockResolvedValueOnce({
         status: 301,
         headers: new Map([['location', 'https://example.com/new']])
@@ -123,8 +130,8 @@ describe('safeFetch', () => {
 
     const response = await safeFetch('https://example.com/old');
     expect(response.status).toBe(200);
-    expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(global.fetch).toHaveBeenNthCalledWith(2, 'https://example.com/new', expect.any(Object));
+    expect(undiciFetch).toHaveBeenCalledTimes(2);
+    expect(undiciFetch).toHaveBeenNthCalledWith(2, 'https://example.com/new', expect.any(Object));
   });
 
   it('should block unsafe redirects', async () => {
@@ -136,7 +143,7 @@ describe('safeFetch', () => {
       }
     });
 
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    (undiciFetch as jest.Mock).mockResolvedValueOnce({
       status: 301,
       headers: new Map([['location', 'http://localhost/secret']])
     });
@@ -144,3 +151,66 @@ describe('safeFetch', () => {
     await expect(safeFetch('https://example.com/redirect-to-internal')).rejects.toThrow('SSRF Blocked: Unsafe URL: http://localhost/secret');
   });
 });
+
+describe('safeLookup', () => {
+  const lookupMock = dns.lookup as unknown as jest.Mock;
+  const run = (options: dns.LookupOptions) =>
+    new Promise<{ err: NodeJS.ErrnoException | null; address: unknown; family?: number }>((resolve) =>
+      safeLookup('example.com', options, (err, address, family) => resolve({ err, address, family })),
+    );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env.ALLOW_INTERNAL_NETWORK_FETCHING;
+  });
+
+  it('returns public addresses', async () => {
+    lookupMock.mockImplementation((hostname, options, callback) => callback(null, [{ address: '93.184.216.34', family: 4 }]));
+    expect(await run({})).toEqual({ err: null, address: '93.184.216.34', family: 4 });
+    expect(await run({ all: true })).toEqual({ err: null, address: [{ address: '93.184.216.34', family: 4 }], family: undefined });
+  });
+
+  it.each(['127.0.0.1', '10.1.2.3', '169.254.169.254', '::1', '::ffff:127.0.0.1', '2002:7f00:1::1', '2001::1', '100::1'])(
+    'refuses to connect to %s',
+    async (address) => {
+      lookupMock.mockImplementation((hostname, options, callback) => callback(null, [{ address, family: address.includes(':') ? 6 : 4 }]));
+      const { err } = await run({});
+      expect(err?.code).toBe('ESSRFBLOCKED');
+    },
+  );
+
+  it('passes DNS errors through', async () => {
+    const dnsError = Object.assign(new Error('not found'), { code: 'ENOTFOUND' });
+    lookupMock.mockImplementation((hostname, options, callback) => callback(dnsError));
+    expect((await run({})).err).toBe(dnsError);
+  });
+
+  it('allows private addresses when ALLOW_INTERNAL_NETWORK_FETCHING=true', async () => {
+    process.env.ALLOW_INTERNAL_NETWORK_FETCHING = 'true';
+    lookupMock.mockImplementation((hostname, options, callback) => callback(null, [{ address: '10.0.0.5', family: 4 }]));
+    expect(await run({})).toEqual({ err: null, address: '10.0.0.5', family: 4 });
+  });
+
+  it('blocks DNS rebinding: a name that passes isSafeUrl but resolves privately on connect', async () => {
+    // First resolution (isSafeUrl) is public, the second (when connecting) is internal
+    lookupMock
+      .mockImplementationOnce((hostname, options, callback) => callback(null, [{ address: '93.184.216.34', family: 4 }]))
+      .mockImplementationOnce((hostname, options, callback) => callback(null, [{ address: '127.0.0.1', family: 4 }]));
+
+    expect(await isSafeUrl('https://rebind.example')).toBe(true);
+    expect((await run({})).err?.code).toBe('ESSRFBLOCKED');
+  });
+});
+
+describe('safeFetch dispatcher', () => {
+  it('sends every request through the pinned-DNS agent', async () => {
+    (dns.lookup as unknown as jest.Mock).mockImplementation((hostname, options, callback) =>
+      callback(null, [{ address: '93.184.216.34', family: 4 }]),
+    );
+    (undiciFetch as jest.Mock).mockResolvedValue({ status: 200, ok: true });
+
+    await safeFetch('https://example.com');
+    expect(undiciFetch).toHaveBeenCalledWith('https://example.com', expect.objectContaining({ dispatcher: expect.anything() }));
+  });
+});
+

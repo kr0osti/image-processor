@@ -111,7 +111,7 @@ Next.js picks up the files in `app/` automatically; `app/manifest.ts` points at 
 A single Next.js application:
 
 - **Browser**: images are laid out on a canvas in the browser (`app/page.tsx`, helpers in `lib/image-layout.ts`), then uploaded as 1500×1500 PNGs.
-- **Server**: API routes save and serve the processed images, proxy remote images past CORS (with SSRF protection in `lib/ssrf.ts`) and scrape webpages for images (`app/actions.ts`).
+- **Server**: API routes save and serve the processed images, proxy remote images past CORS (with SSRF protection in `lib/ssrf.ts`: private and reserved addresses are refused both when the URL is checked and when the connection is opened, so DNS rebinding can't slip through) and scrape webpages for images (`app/actions.ts`).
 - **Background job**: a cron job started from `instrumentation.ts` deletes old files from `public/uploads`.
 
 ### API Endpoints

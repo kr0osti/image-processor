@@ -1,5 +1,9 @@
+/**
+ * @jest-environment node
+ */
 // Import the function to test first
 import { GET } from '../../app/api/proxy/route';
+import { fetch as undiciFetch } from 'undici';
 
 // Mock next/server
 jest.mock('next/server', () => {
@@ -22,8 +26,11 @@ jest.mock('../../app/utils/rate-limit.js', () => ({
   createRateLimiter: jest.fn(() => jest.fn().mockResolvedValue(null)),
 }));
 
-// Mock global fetch
-global.fetch = jest.fn();
+// safeFetch uses undici's fetch with a pinned-DNS agent
+jest.mock('undici', () => ({
+  Agent: jest.fn(),
+  fetch: jest.fn(),
+}));
 
 describe('Proxy API', () => {
   beforeEach(() => {
@@ -56,7 +63,7 @@ describe('Proxy API', () => {
       headers: new Map([['content-type', 'image/jpeg']]),
       arrayBuffer: jest.fn().mockResolvedValue(mockImageBuffer),
     };
-    global.fetch.mockResolvedValue(mockResponse);
+    undiciFetch.mockResolvedValue(mockResponse);
 
     // Create a mock request with URL parameter
     const request = { url: 'http://localhost:3000/api/proxy?url=https://example.com/image.jpg', nextUrl: new URL('http://localhost:3000/api/proxy?url=https://example.com/image.jpg'), headers: new Map([['origin', 'http://localhost:3000']]) };
@@ -68,7 +75,7 @@ describe('Proxy API', () => {
     expect(response.status).toBe(200);
 
     // Verify that fetch was called with the correct URL and headers
-    expect(global.fetch).toHaveBeenCalledWith('https://example.com/image.jpg', expect.objectContaining({
+    expect(undiciFetch).toHaveBeenCalledWith('https://example.com/image.jpg', expect.objectContaining({
       headers: expect.objectContaining({
         'User-Agent': expect.any(String),
         'Accept': expect.any(String),
@@ -83,7 +90,7 @@ describe('Proxy API', () => {
 
   it('should return error if fetch fails', async () => {
     // Mock failed fetch response
-    global.fetch.mockResolvedValue({
+    undiciFetch.mockResolvedValue({
       ok: false,
       status: 404,
       statusText: 'Not Found',

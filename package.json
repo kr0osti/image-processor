@@ -1,6 +1,6 @@
 {
   "name": "my-v0-project",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "private": true,
   "packageManager": "pnpm@10.34.7",
   "engines": {
@@ -41,7 +41,8 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "sonner": "^2.0.8",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "undici": "^7.30.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
