@@ -100,27 +100,18 @@ pnpm test:coverage
 pnpm test:e2e
 ```
 
-### Running tests in Docker
+### Running tests without a local Node.js
 
-For running tests in the Docker environment, use the provided script:
+The tests run as-is in a throwaway Node container; nothing needs to be copied into the app container:
 
 ```bash
-# Run all API tests
-./docker-test.sh
+docker run --rm -v "$PWD":/app -w /app node:24-alpine \
+  sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm test"
 
-# Run specific test file
-./docker-test.sh __tests__/api/images.test.js
-
-# Run tests for a specific directory
-./docker-test.sh __tests__/api/
+# Run a single file or directory
+docker run --rm -v "$PWD":/app -w /app node:24-alpine \
+  sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm test __tests__/api/"
 ```
-
-The script handles:
-- Setting up the proper test environment
-- Configuring mocks for dependencies
-- Copying test files to the container
-- Running tests with the correct parameters
-- Cleaning up temporary files
 
 ## 📦 Dependency Management
 
