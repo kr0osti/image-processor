@@ -18,10 +18,19 @@ export async function GET(request) {
     if (!filename) {
       return NextResponse.json({ error: 'No filename provided' }, { status: 400 });
     }
-    
-    // Construct the file path
-    const filePath = path.join(process.cwd(), 'public', 'uploads', filename);
-    
+
+    // Only allow plain filenames with an image extension (no path separators or "..")
+    if (!/^[A-Za-z0-9_-][A-Za-z0-9._-]*\.(png|jpe?g|gif|webp)$/i.test(filename)) {
+      return NextResponse.json({ error: 'Invalid filename' }, { status: 400 });
+    }
+
+    // Construct the file path and make sure it stays inside the uploads directory
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    const filePath = path.resolve(uploadsDir, filename);
+    if (path.dirname(filePath) !== uploadsDir) {
+      return NextResponse.json({ error: 'Invalid filename' }, { status: 400 });
+    }
+
     // Check if the file exists
     if (!existsSync(filePath)) {
       console.error(`File not found: ${filePath}`);
