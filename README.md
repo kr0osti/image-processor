@@ -75,6 +75,25 @@ UI text lives in `messages/<locale>.json` (`en` is the source; `fr`, `es` and `d
 
 To update a translation, edit the matching file and keep every key, `{placeholder}` and `<tag>` from `en.json`; `pnpm test` fails if one is missing. Plurals use ICU syntax, e.g. `{count, plural, one {# image} other {# images}}`. To add a language, add its code to `i18n/config.ts` and create `messages/<code>.json`.
 
+### Icons
+
+The favicon, Apple touch icon and web-app icons are generated from the SVG masters in `scripts/icons/`:
+
+| Source | Used for |
+|--------|----------|
+| `icon.svg` | `app/icon.svg`, `app/favicon.ico` (16/32/48 px), `public/icons/icon-192.png` and `icon-512.png` |
+| `icon-square.svg` | `app/apple-icon.png` (180 px, opaque; iOS rounds the corners) |
+| `icon-maskable.svg` | `public/icons/icon-maskable-192.png` and `icon-maskable-512.png` (glyph inside the 80% safe zone) |
+
+To change the icons, edit the SVGs and re-render them all:
+
+```bash
+pnpm exec playwright install chromium   # once
+node scripts/icons/render.mjs
+```
+
+Next.js picks up the files in `app/` automatically; `app/manifest.ts` points at `public/icons/`. The logo in the header (`components/site-header.tsx`) is drawn inline, so update it too if the glyph changes.
+
 ## 🏗️ Architecture
 
 ### Components
