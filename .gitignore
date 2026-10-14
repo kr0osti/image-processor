@@ -37,3 +37,7 @@ next-env.d.ts
 !public/uploads/.gitkeep
 
 coverage/
+
+# playwright
+/playwright-report/
+/test-results/
