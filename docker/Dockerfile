@@ -82,6 +82,9 @@ RUN chmod +x /entrypoint.sh && chown root:root /entrypoint.sh
 EXPOSE 3000
 
 ENV PORT=3000
+# Next.js standalone binds to $HOSTNAME; Docker sets it to the container ID,
+# which leaves localhost (and the container healthcheck) unreachable
+ENV HOSTNAME=0.0.0.0
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "server.js"]
