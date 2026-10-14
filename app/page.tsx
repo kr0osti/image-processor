@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import React from 'react';
 
 // This is fine at module level - it's not a hook
@@ -89,7 +89,6 @@ export default function ImageProcessor() {
   const [url, setUrl] = useState("")
   const [baseUrl, setBaseUrl] = useState("https://zhik.com")
   const [useCustomBaseUrl, setUseCustomBaseUrl] = useState(false)
-  const [imageUrls, setImageUrls] = useState<string[]>([])
   const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([])
   const [reprocessingIndex, setReprocessingIndex] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
@@ -114,13 +113,13 @@ export default function ImageProcessor() {
   }, [imageMetadata]);
 
   const [sizeFilter, setSizeFilter] = useState<('small' | 'medium' | 'large' | 'unknown')[]>(['large'])
-  const [filteredImages, setFilteredImages] = useState<string[]>([])
   const [minWidth, setMinWidth] = useState<number | undefined>(undefined)
   const [minHeight, setMinHeight] = useState<number | undefined>(undefined)
   const [customSizeEnabled, setCustomSizeEnabled] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
-  const [imageUrlToFilename, setImageUrlToFilename] = useState<Map<string, string>>(new Map())
+  // Original filename for each source URL; a ref so processing started in the same event sees new entries
+  const imageUrlToFilename = useRef<Map<string, string>>(new Map())
 
   const addLog = (message: string) => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -178,10 +177,10 @@ export default function ImageProcessor() {
       })
   }
 
-  // Add this effect to update filtered images when size filter changes
-  useEffect(() => {
+  // Fetched images matching the size filters
+  const filteredImages = useMemo(() => {
     if (fetchedImages.length > 0 && imageMetadata.length > 0) {
-      const filtered = imageMetadata
+      return imageMetadata
         .filter(img => {
           // Filter by predefined sizes
           const matchesPresetSize = sizeFilter.includes(img.size || 'unknown');
@@ -195,20 +194,9 @@ export default function ImageProcessor() {
           return matchesPresetSize || (customSizeEnabled && matchesCustomSize);
         })
         .map(img => img.url)
-
-      setFilteredImages(filtered)
-      addLog(`Filtered to ${filtered.length} images based on size criteria`)
-    } else {
-      setFilteredImages(fetchedImages)
     }
+    return fetchedImages
   }, [fetchedImages, imageMetadata, sizeFilter, minWidth, minHeight, customSizeEnabled])
-
-  // Process images when imageUrls change
-  useEffect(() => {
-    if (imageUrls.length > 0) {
-      processImages(imageUrls)
-    }
-  }, [imageUrls])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -218,7 +206,6 @@ export default function ImageProcessor() {
     setError("")
     setLogs([])
     setFetchedImages([])
-    setFilteredImages([])
     setSelectedImages([])
     setImageMetadata([])
     addLog(`Fetching images from URL: ${url}`)
@@ -248,18 +235,12 @@ export default function ImageProcessor() {
 
         setImageMetadata(metadata)
         setFetchedImages(result.imageUrls)
-        setFilteredImages(result.imageUrls)
 
         // Store filename mapping for fetched images, keeping earlier entries so
         // previously processed images can still be reprocessed under their name
-        const imageUrls = result.imageUrls
-        setImageUrlToFilename((prev) => {
-          const newMapping = new Map(prev)
-          imageUrls.forEach((imgUrl, index) => {
-            const filename = metadata[index]?.filename || imgUrl.split("/").pop()?.split("?")[0] || `image-${index + 1}`
-            newMapping.set(imgUrl, filename)
-          })
-          return newMapping
+        result.imageUrls.forEach((imgUrl, index) => {
+          const filename = metadata[index]?.filename || imgUrl.split("/").pop()?.split("?")[0] || `image-${index + 1}`
+          imageUrlToFilename.current.set(imgUrl, filename)
         })
 
         // Load images to determine their sizes
@@ -558,12 +539,8 @@ export default function ImageProcessor() {
     addLog(`Created object URLs for ${fileUrls.length} files`)
 
     setUploadedFiles((prev) => [...prev, ...files.map((file, index) => ({ file, url: fileUrls[index] }))])
-    setImageUrlToFilename((prev) => {
-      const mapping = new Map(prev)
-      files.forEach((file, index) => mapping.set(fileUrls[index], file.name))
-      return mapping
-    })
-    setImageUrls(fileUrls)
+    files.forEach((file, index) => imageUrlToFilename.current.set(fileUrls[index], file.name))
+    processImages(fileUrls)
   }
 
   const resolveUrl = (url: string, base: string): string => {
@@ -719,7 +696,7 @@ export default function ImageProcessor() {
     addLog(`Compressed image from ${Math.round(processedImage.length / 1024)} KB to ${Math.round(compressedImage.length / 1024)} KB`)
 
     // Get original filename if available
-    const originalFilename = imageUrlToFilename.get(imageUrl)
+    const originalFilename = imageUrlToFilename.current.get(imageUrl)
 
     // Convert data URL to real URL
     const realUrl = await convertDataUrlToRealUrl(compressedImage, originalFilename)
@@ -1216,7 +1193,6 @@ export default function ImageProcessor() {
 
     // Reset all file-related state
     setUploadedFiles([])
-    setImageUrls([])
     setProcessedImages([])
     setFetchedImages([])
     setSelectedImages([])
@@ -1232,7 +1208,7 @@ export default function ImageProcessor() {
     }
 
     addLog(`Processing ${selectedImages.length} selected images`)
-    setImageUrls(selectedImages)
+    processImages(selectedImages)
   }
 
   const toggleImageSelection = (imageUrl: string) => {
