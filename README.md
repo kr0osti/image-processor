@@ -13,8 +13,8 @@ A powerful web application that allows you to download, process, and standardize
 - **Light & Dark Themes**: Follows the system setting, with a toggle in the header
 - **Download Options**: Download individual images or as a ZIP archive
 - **CORS Handling**: Creates placeholders for images that can't be loaded due to CORS restrictions
-- **Automatic Cleanup**: Uploaded files are automatically deleted after 1 hour
-- **Rate Limiting**: All API endpoints are protected with rate limiting to prevent abuse
+- **Automatic Cleanup**: A background job deletes processed files on the `CLEANUP_CRON_SCHEDULE` (by default every 30 minutes, removing files older than one interval)
+- **Rate Limiting**: The API endpoints are rate limited per client IP to prevent abuse (see the table below)
 
 ## 🚀 Quick Start
 
@@ -22,8 +22,8 @@ A powerful web application that allows you to download, process, and standardize
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/nextjs-image-processor.git
-cd nextjs-image-processor
+git clone https://github.com/kr0osti/image-processor.git
+cd image-processor
 
 # Create a .env file from the example
 cp .env.example .env
@@ -38,8 +38,8 @@ The application will be available at http://localhost:6060
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/nextjs-image-processor.git
-cd nextjs-image-processor
+git clone https://github.com/kr0osti/image-processor.git
+cd image-processor
 
 # Install dependencies
 pnpm install
@@ -59,13 +59,13 @@ Customize the application by setting these environment variables in your `.env` 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `VERSION` | Docker image version to use | latest |
-| `NEXT_PUBLIC_SITE_NAME` | The name of your site | NextJS Image Processor |
-| `NEXT_PUBLIC_SITE_DESCRIPTION` | Site description | A powerful web application... |
+| `NEXT_PUBLIC_SITE_NAME` | The name of your site, shown in the header and page title | Image Processor |
+| `NEXT_PUBLIC_SITE_DESCRIPTION` | Site description for search engines and link previews | Translated default description |
 | `NEXT_PUBLIC_SITE_URL` | Your site's URL | https://yourdomain.com |
 | `NEXT_PUBLIC_SITE_THEME_COLOR` | Theme color (hex) | #000000 |
 | `NEXT_PUBLIC_SITE_BACKGROUND_COLOR` | Background color (hex) | #ffffff |
-| `CLEANUP_API_KEY` | API key for the cleanup endpoint | change-this-to-a-secure-key |
-| `CLEANUP_CRON_SCHEDULE` | Cron schedule for the cleanup job | */30 * * * * |
+| `CLEANUP_API_KEY` | API key for `/api/cleanup` (**required**: the endpoint returns 500 when it is unset) | (none) |
+| `CLEANUP_CRON_SCHEDULE` | Cron schedule for the cleanup job; files older than one interval are deleted | */30 * * * * |
 | `NEXT_PUBLIC_DEBUG` | Enable debug logging | false |
 | `ALLOWED_DEV_ORIGINS` | Comma-separated hosts allowed to open `next dev` from another machine (e.g. a LAN IP) | (none) |
 
@@ -98,18 +98,20 @@ Next.js picks up the files in `app/` automatically; `app/manifest.ts` points at 
 
 ### Components
 
-The application consists of two main components:
+A single Next.js application:
 
-1. **Main Application**: A Next.js application that handles image processing and runs a background cleanup cron job
+- **Browser**: images are laid out on a canvas in the browser (`app/page.tsx`, helpers in `lib/image-layout.ts`), then uploaded as 1500×1500 PNGs.
+- **Server**: API routes save and serve the processed images, proxy remote images past CORS (with SSRF protection in `lib/ssrf.ts`) and scrape webpages for images (`app/actions.ts`).
+- **Background job**: a cron job started from `instrumentation.ts` deletes old files from `public/uploads`.
 
 ### API Endpoints
 
 | Endpoint | Method | Description | Rate Limit |
 |----------|--------|-------------|------------|
-| `/api/images` | POST | Upload and process images | 300 req/min |
+| `/api/images` | POST | Save a processed image | 300 req/min |
 | `/api/proxy` | GET | Proxy for fetching images to avoid CORS issues | 500 req/min |
-| `/api/serve-image` | GET | Serve processed images from the server | 120 req/min |
-| `/api/cleanup` | GET | Trigger cleanup of old uploads (requires API key) | 5 req/min |
+| `/api/serve-image` | GET | Serve processed images from the server | none |
+| `/api/cleanup` | GET | Delete uploads older than `maxAge` minutes (default 60); requires `?key=<CLEANUP_API_KEY>` | 5 req/min |
 | `/api/healthcheck` | GET | Check if the application is running | 30 req/min |
 
 ## 🧪 Testing
@@ -145,35 +147,41 @@ docker run --rm -v "$PWD":/app -w /app node:24-alpine \
 
 ## 📦 Dependency Management
 
-This project uses pnpm for dependency management. To update dependencies:
+This project uses pnpm (the version is pinned in `package.json` and enabled with `corepack enable`). Dependabot opens weekly update PRs; minor and patch updates merge automatically once CI passes.
 
 ```bash
-# Update dependencies and regenerate lockfile
-pnpm update-lockfile
+# Update dependencies within their ranges and refresh the lockfile
+pnpm update
+
+# Regenerate the lockfile only, e.g. after editing package.json by hand
+pnpm install --lockfile-only
 ```
 
 ## 🔄 Docker Development
 
-For development with Docker:
+For development with Docker (hot reload, source mounted into the container):
 
 ```bash
-# Start the development environment
-cd docker && docker-compose -f docker-compose-dev.yml up -d
+# Start the development environment on http://localhost:4576
+pnpm docker:dev
 
-# Stop the development environment
-cd docker && docker-compose -f docker-compose-dev.yml down
+# Stop it
+pnpm docker:dev:down
 ```
+
+To open the dev server from another machine, set `ALLOWED_DEV_ORIGINS` to the host you use (e.g. `192.168.1.10`).
 
 ## 🛠️ Troubleshooting
 
 ### Permission Issues
 
-If you encounter permission errors when uploading images, ensure the `public/uploads` directory has proper permissions:
+In Docker, the entrypoint fixes ownership of the mounted `public/uploads` directory on start and then runs the app as user `1001`. If saving images still fails, check the container logs and that the host directory is writable by UID 1001:
 
 ```bash
-mkdir -p public/uploads
-chmod -R 777 public/uploads
+sudo chown -R 1001:1001 public/uploads
 ```
+
+When running locally without Docker, `public/uploads` must be writable by your user.
 
 ### Rate Limiting
 
