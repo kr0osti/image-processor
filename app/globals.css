@@ -141,10 +141,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
+  /* Run decorative animations once, instantly. Spinners are excluded: an
+     infinite animation at 0.01ms spins wildly instead of stopping. */
+  *:not(.animate-spin),
   ::before,
   ::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  /* Spinners show that work is in progress, so keep them, just slower */
+  .animate-spin {
+    animation-duration: 1.5s !important;
   }
 }
