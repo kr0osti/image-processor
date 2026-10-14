@@ -10,7 +10,10 @@ async function expectNoBlockingViolations(page: Page) {
   const blocking = results.violations.filter((v) => BLOCKING_IMPACTS.includes(v.impact ?? ''));
 
   // Readable summary in the failure message instead of the raw axe dump
-  const summary = blocking.map((v) => `${v.impact}: ${v.id} – ${v.help} (${v.nodes.length} element(s))\n  ${v.helpUrl}`);
+  const summary = blocking.map((v) => [
+    `${v.impact}: ${v.id} – ${v.help}\n  ${v.helpUrl}`,
+    ...v.nodes.map((n) => `  • ${n.target.join(' ')}\n    ${(n.failureSummary ?? '').replace(/\n/g, '\n    ')}`),
+  ].join('\n'));
   expect(summary, summary.join('\n')).toEqual([]);
 }
 
