@@ -1,7 +1,10 @@
 "use server"
 
 import * as cheerio from "cheerio"
-import { isSafeUrl, safeFetch } from "@/lib/ssrf"
+import { isSafeUrl, safeFetch, readBodyWithLimit } from "@/lib/ssrf"
+
+// Maximum size of a scraped HTML page (10 MB)
+const MAX_HTML_BYTES = 10 * 1024 * 1024
 
 // Add this interface to define image metadata
 export interface ImageMetadata {
@@ -62,7 +65,7 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
       }
     }
 
-    const html = await response.text()
+    const html = new TextDecoder().decode(await readBodyWithLimit(response, MAX_HTML_BYTES))
     logs.push(`HTML content length: ${html.length} characters`)
 
     if (html.length < 100) {
@@ -110,12 +113,12 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
     logs.push("Searching for background images in style attributes...")
     $("[style*='background']").each((_, element) => {
       const style = $(element).attr("style") || ""
-      const matches = style.match(/url$$['"]?([^'"()]+)['"]?$$/g)
+      const matches = style.match(/url\(['"]?([^'"()]+)['"]?\)/g)
 
       if (matches) {
         logs.push(`Found background image in style: ${style}`)
         matches.forEach((match) => {
-          const bgUrl = match.replace(/url$$['"]?([^'"()]+)['"]?$$/, "$1")
+          const bgUrl = match.replace(/url\(['"]?([^'"()]+)['"]?\)/, "$1")
           addImageUrl(bgUrl, baseUrl, imageUrls, logs)
         })
       }

@@ -46,12 +46,28 @@ async function ensureUploadsDir() {
   }
 }
 
+// Allowed image MIME types and the file extension used when saving them
+const ALLOWED_IMAGE_TYPES = {
+  'image/png': 'png',
+  'image/jpeg': 'jpeg',
+  'image/jpg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+};
+
+// Maximum size of a single saved image (25 MB)
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+
+// Maximum request body size (allows a 25 MB image as base64 plus JSON overhead)
+const MAX_REQUEST_BYTES = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 64 * 1024;
+
 // Create a rate limiter for the images endpoint
 // Allow 300 requests per minute per IP address
 const rateLimiter = createRateLimiter({
   limit: 300,
   windowMs: 60 * 1000, // 1 minute
-  message: 'Too many image upload requests. Please try again later.'
+  message: 'Too many image upload requests. Please try again later.',
+  name: 'images'
 });
 
 /**
@@ -91,12 +107,23 @@ export async function POST(request) {
   try {
     const contentType = request.headers.get('content-type') || '';
 
+    // Reject oversized requests before reading the body
+    const contentLength = Number(request.headers.get('content-length'));
+    if (contentLength > MAX_REQUEST_BYTES) {
+      if (timeoutId) clearTimeout(timeoutId);
+
+      return NextResponse.json({
+        success: false,
+        message: 'Request too large'
+      }, { status: 413 });
+    }
+
     // Handle JSON request (dataUrl)
     if (contentType.includes('application/json')) {
       const body = await request.json();
       const { dataUrl, originalFilename } = body;
 
-      if (!dataUrl) {
+      if (!dataUrl || typeof dataUrl !== 'string') {
         // Clear the timeout since we're about to return
         if (timeoutId) clearTimeout(timeoutId);
 
@@ -115,7 +142,7 @@ export async function POST(request) {
       // Extract the base64 data from the data URL
       const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
 
-      if (!matches || matches.length !== 3) {
+      if (!matches || matches.length !== 3 || !ALLOWED_IMAGE_TYPES[matches[1].toLowerCase()]) {
         // Clear the timeout since we're about to return
         if (timeoutId) clearTimeout(timeoutId);
 
@@ -125,16 +152,24 @@ export async function POST(request) {
         }, { status: 400 });
       }
 
+      if (matches[2].length > Math.ceil(MAX_IMAGE_BYTES * 4 / 3)) {
+        if (timeoutId) clearTimeout(timeoutId);
+
+        return NextResponse.json({
+          success: false,
+          message: 'Image too large'
+        }, { status: 413 });
+      }
+
       const uploadsDir = await ensureUploadsDir();
-      const mimeType = matches[1];
-      const fileExt = mimeType.split('/')[1] || 'png';
-      
+      const fileExt = ALLOWED_IMAGE_TYPES[matches[1].toLowerCase()];
+
       // Generate filename based on original filename if provided
       let filename;
-      if (originalFilename) {
-        // Sanitize the filename and append -processed before the extension
-        const sanitized = originalFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const nameWithoutExt = sanitized.replace(/\.[^/.]+$/, '');
+      if (typeof originalFilename === 'string' && originalFilename) {
+        // Sanitize the filename (no leading dots) and append -processed before the extension
+        const sanitized = originalFilename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '');
+        const nameWithoutExt = sanitized.replace(/\.[^/.]+$/, '').slice(0, 200) || 'image';
         filename = `${nameWithoutExt}-processed.${fileExt}`;
       } else {
         // Fallback to random filename if no original filename provided
@@ -168,9 +203,7 @@ export async function POST(request) {
           success: true,
           message: 'Image saved successfully',
           url: publicUrl,
-          apiUrl: apiUrl,
-          filePath: filePath,
-          publicDir: path.join(process.cwd(), 'public')
+          apiUrl: apiUrl
         });
       } catch (writeError) {
         console.error(`Error writing file: ${writeError.message}`);
@@ -180,8 +213,7 @@ export async function POST(request) {
 
         return NextResponse.json({
           success: false,
-          message: 'Failed to save image',
-          error: writeError.message
+          message: 'Failed to save image'
         }, { status: 500 });
       }
     }
@@ -217,10 +249,20 @@ export async function POST(request) {
 
         // Process uploaded files concurrently
         const filePromises = files.map(async (file) => {
-          if (!file) return null;
+          if (!file || typeof file !== 'object') return null;
+
+          // Only accept allowed image types within the size limit
+          const fileExt = ALLOWED_IMAGE_TYPES[(file.type || '').toLowerCase()];
+          if (!fileExt || file.size > MAX_IMAGE_BYTES) {
+            return {
+              originalName: file.name,
+              processedUrl: null,
+              success: false,
+              message: !fileExt ? 'Unsupported file type' : 'File too large'
+            };
+          }
 
           // Save the file to the uploads directory
-          const fileExt = file.name.split('.').pop() || 'png';
           const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
           const filePath = path.join(uploadsDir, filename);
           const publicUrl = `/uploads/${filename}`;

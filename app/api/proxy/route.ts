@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRateLimiter } from '../../utils/rate-limit.js';
-import { isSafeUrl, safeFetch } from '@/lib/ssrf';
+import { isSafeUrl, safeFetch, readBodyWithLimit } from '@/lib/ssrf';
+
+// Maximum size of a proxied image (25 MB)
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
 // Create a rate limiter for the proxy endpoint
 // Allow 500 requests per minute per IP address
 const rateLimiter = createRateLimiter({
   limit: 500,
   windowMs: 60 * 1000, // 1 minute
-  message: 'Too many image proxy requests. Please try again later.'
+  message: 'Too many image proxy requests. Please try again later.',
+  name: 'proxy'
 });
 
 /**
  * API route handler for proxying images from external sources
  *
  * This endpoint fetches images from external URLs and serves them through
- * the application's domain to avoid CORS issues. It adds appropriate headers
- * to make the images accessible to the client-side code.
+ * the application's domain to avoid CORS issues. Only raster image responses
+ * up to 25 MB are returned (SVG, HTML and other types are rejected).
  *
  * Rate limited to 500 requests per minute per IP address.
  *
@@ -40,7 +44,7 @@ export async function GET(request: NextRequest) {
     const response = await safeFetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Referer": new URL(url).origin,
         "Sec-Fetch-Dest": "image",
@@ -53,8 +57,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: `Failed to fetch image: ${response.statusText}` }, { status: response.status });
     }
 
-    const contentType = response.headers.get('content-type') || 'application/octet-stream';
-    const buffer = await response.arrayBuffer();
+    // Only proxy raster images: SVG or HTML served from our origin could run scripts
+    const contentType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!contentType.startsWith('image/') || contentType === 'image/svg+xml') {
+      return NextResponse.json({ error: 'URL did not return a supported image' }, { status: 415 });
+    }
+
+    const buffer = await readBodyWithLimit(response, MAX_IMAGE_BYTES);
 
     // Security: Restrict CORS to prevent unauthorized cross-origin access.
     // We only allow our own application to access this proxy.
@@ -74,12 +83,17 @@ export async function GET(request: NextRequest) {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400',
         'Vary': 'Origin',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
         ...(allowedOrigin && { 'Access-Control-Allow-Origin': allowedOrigin })
       }
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes('SSRF Blocked')) {
       return NextResponse.json({ error: 'The provided URL is not allowed for security reasons.' }, { status: 403 });
+    }
+    if (error instanceof Error && error.message === 'Response too large') {
+      return NextResponse.json({ error: 'Image is too large' }, { status: 413 });
     }
     console.error('Proxy error:', error);
     return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });

@@ -4,42 +4,55 @@ import { promisify } from 'util';
 
 const lookup = promisify(dns.lookup);
 
+const blockList = new net.BlockList();
+
+// IPv4 private, loopback, link-local, CGNAT, reserved and multicast ranges
+([
+  ['0.0.0.0', 8],
+  ['10.0.0.0', 8],
+  ['100.64.0.0', 10],
+  ['127.0.0.0', 8],
+  ['169.254.0.0', 16],
+  ['172.16.0.0', 12],
+  ['192.0.0.0', 24],
+  ['192.0.2.0', 24],
+  ['192.168.0.0', 16],
+  ['198.18.0.0', 15],
+  ['198.51.100.0', 24],
+  ['203.0.113.0', 24],
+  ['224.0.0.0', 4],
+  ['240.0.0.0', 4],
+] as const).forEach(([address, prefix]) => blockList.addSubnet(address, prefix, 'ipv4'));
+
+// IPv6 unspecified, loopback, unique-local, link-local, multicast and documentation ranges
+([
+  ['::', 128],
+  ['::1', 128],
+  ['fc00::', 7],
+  ['fe80::', 10],
+  ['ff00::', 8],
+  ['2001:db8::', 32],
+] as const).forEach(([address, prefix]) => blockList.addSubnet(address, prefix, 'ipv6'));
+
 /**
  * Checks if an IP address is private or reserved.
  */
 function isPrivateIP(ip: string): boolean {
   if (net.isIPv4(ip)) {
-    const parts = ip.split('.').map(Number);
-
-    if (parts[0] === 10) return true;
-    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-    if (parts[0] === 192 && parts[1] === 168) return true;
-    if (parts[0] === 169 && parts[1] === 254) return true;
-    if (parts[0] === 127) return true;
-    if (ip === '0.0.0.0') return true;
-
-    return false;
+    return blockList.check(ip, 'ipv4');
   }
 
   if (net.isIPv6(ip)) {
     const lowerIp = ip.toLowerCase();
-    // Normalize IPv6 by removing leading zeros in groups if necessary
-    // node's dns.lookup generally returns canonicalized or near-canonicalized forms
-    // but we check for common patterns.
-
-    // Loopback: ::1
-    if (lowerIp === '::1' || lowerIp.replace(/^0+:|:0+/g, ':') === '::1') return true;
-
-    // Link-local: fe80::/10
-    if (lowerIp.startsWith('fe80:')) return true;
-
-    // Unique Local: fc00::/7
-    if (lowerIp.startsWith('fc00:') || lowerIp.startsWith('fd00:')) return true;
-
-    // Unspecified: ::
-    if (lowerIp === '::' || lowerIp.replace(/^[0:]+$/g, '::') === '::') return true;
-
-    return false;
+    // IPv4-mapped (::ffff:a.b.c.d) and NAT64 (64:ff9b::a.b.c.d) addresses: check the embedded IPv4
+    const embedded = lowerIp.match(/^(?:::ffff:|64:ff9b::)(\d+\.\d+\.\d+\.\d+)$/);
+    if (embedded) {
+      return blockList.check(embedded[1], 'ipv4');
+    }
+    if (lowerIp.startsWith('::ffff:') || lowerIp.startsWith('64:ff9b::')) {
+      return true;
+    }
+    return blockList.check(ip, 'ipv6');
   }
 
   return true;
@@ -135,4 +148,50 @@ export async function safeFetch(
 
     return response;
   }
+}
+
+/**
+ * Reads a response body, aborting if it exceeds the given size.
+ *
+ * @param response The response to read
+ * @param maxBytes Maximum allowed body size in bytes
+ * @returns The body bytes
+ * @throws Error if the body is larger than maxBytes
+ */
+export async function readBodyWithLimit(response: Response, maxBytes: number): Promise<ArrayBuffer> {
+  const declaredLength = Number(response.headers?.get('content-length'));
+  if (declaredLength > maxBytes) {
+    throw new Error('Response too large');
+  }
+
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > maxBytes) {
+      throw new Error('Response too large');
+    }
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error('Response too large');
+    }
+    chunks.push(value);
+  }
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body.buffer;
 }

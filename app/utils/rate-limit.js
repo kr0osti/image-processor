@@ -11,6 +11,7 @@
  * @property {number} limit - Maximum number of requests allowed within the window
  * @property {number} windowMs - Time window in milliseconds
  * @property {string} [message] - Optional message to return when rate limited
+ * @property {string} [name] - Optional limiter name; each name gets its own counters so limiters don't share a bucket
  * @property {Function} [keyGenerator] - Optional function to generate a key to identify clients
  */
 
@@ -55,6 +56,7 @@ export function createRateLimiter(config) {
     limit = 60,
     windowMs = 60 * 1000, // 1 minute by default
     message = 'Too many requests, please try again later.',
+    name = '',
     keyGenerator = (req) => {
       // Default to IP-based rate limiting
       // In Next.js, we need to use the headers to get the IP address
@@ -70,7 +72,7 @@ export function createRateLimiter(config) {
    * @returns {Promise<Response|null>} A response object if rate limited, null otherwise
    */
   return async function rateLimit(req) {
-    const key = keyGenerator(req);
+    const key = name ? `${name}:${keyGenerator(req)}` : keyGenerator(req);
     const now = Date.now();
     
     // Initialize or get the current rate limit data for this key
