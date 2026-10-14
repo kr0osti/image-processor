@@ -74,7 +74,7 @@ async function runBenchmark() {
      if (remaining.length === 0 || (remaining.length === 1 && remaining[0] === '.gitkeep')) {
         console.log('Benchmark directory is clean.');
      }
-  } catch (err) {
+  } catch {
       // ignore
   }
 }

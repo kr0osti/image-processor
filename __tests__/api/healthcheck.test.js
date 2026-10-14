@@ -5,7 +5,6 @@ if (typeof Request === "undefined") { global.Request = class Request {}; }
 
 // Import the API route
 const { GET } = require('../../app/api/healthcheck/route');
-const { NextRequest } = require('next/server');
 
 // Create mock functions
 

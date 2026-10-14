@@ -13,6 +13,28 @@ export default defineConfig([
       "no-console": ["warn", { allow: ["warn", "error"] }],
     },
   },
+  {
+    // The base rule misreads TypeScript (e.g. parameter names in function types)
+    files: ["**/*.ts", "**/*.tsx"],
+    rules: {
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "warn",
+    },
+  },
+  {
+    // CLI scripts, Jest config/setup and tests print to the terminal on purpose,
+    // and server-side code logs to stdout, which is the container log
+    files: ["*.js", "config/**", "scripts/**", "__tests__/**", "app/api/**", "app/utils/**"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  {
+    files: ["__tests__/**"],
+    rules: {
+      "@next/next/no-img-element": "off",
+    },
+  },
   globalIgnores([
     ".next/**",
     "out/**",

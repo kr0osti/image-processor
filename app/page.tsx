@@ -8,21 +8,16 @@ const isBrowser = typeof window !== 'undefined';
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { fetchImagesFromUrl } from "./actions"
-import { Loader2, Globe, Upload, AlertTriangle, Info, Download, Trash2, Filter, ChevronDown, X } from "lucide-react"
+import { Loader2, Globe, Upload, AlertTriangle, Download, Trash2, Filter, ChevronDown, X } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Toggle } from "@/components/ui/toggle"
 import JSZip from "jszip"
-import { Check } from "lucide-react"
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -116,15 +111,13 @@ export default function ImageProcessor() {
   const [minWidth, setMinWidth] = useState<number | undefined>(undefined)
   const [minHeight, setMinHeight] = useState<number | undefined>(undefined)
   const [customSizeEnabled, setCustomSizeEnabled] = useState(false)
-  const [logs, setLogs] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
   // Original filename for each source URL; a ref so processing started in the same event sees new entries
   const imageUrlToFilename = useRef<Map<string, string>>(new Map())
 
   const addLog = (message: string) => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      // Check if DEBUG is enabled - add more explicit logging to debug the issue
-      console.log(`Debug setting: ${process.env.NEXT_PUBLIC_DEBUG}`)
+      // eslint-disable-next-line no-console -- debug output, only when NEXT_PUBLIC_DEBUG is on
       console.log(`[${new Date().toLocaleTimeString()}] ${message}`)
     }
   }
@@ -204,7 +197,6 @@ export default function ImageProcessor() {
 
     setLoading(true)
     setError("")
-    setLogs([])
     setFetchedImages([])
     setSelectedImages([])
     setImageMetadata([])
@@ -257,70 +249,6 @@ export default function ImageProcessor() {
     }
   }
 
-
-  const processHtmlImageTag = (imgElement: HTMLImageElement, width: number, height: number) => {
-    addLog("Creating placeholder image from HTML tag dimensions")
-
-    // Get the canvas
-    const canvas = canvasRef.current
-    if (!canvas) {
-      addLog("Canvas reference not available")
-      return
-    }
-
-    // Set canvas size to match the image dimensions with a reasonable max size
-    const maxDimension = 1000
-    const scale = Math.min(1, maxDimension / Math.max(width, height))
-    canvas.width = width * scale
-    canvas.height = height * scale
-
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    if (!ctx) {
-      addLog("Failed to get canvas context")
-      return
-    }
-
-    // Draw a placeholder with the image dimensions
-    ctx.fillStyle = "#f0f0f0" // Light gray background
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-    // Add a border
-    ctx.strokeStyle = "#cccccc"
-    ctx.lineWidth = 1
-    ctx.strokeRect(0, 0, canvas.width, canvas.height)
-
-    // Add text with dimensions
-    ctx.fillStyle = "#666666"
-    ctx.font = "14px Arial"
-    ctx.textAlign = "center"
-    ctx.fillText(`Image Placeholder (${width}x${height})`, canvas.width / 2, canvas.height / 2 - 10)
-
-    // Add alt text if available
-    const alt = imgElement.getAttribute("alt")
-    if (alt) {
-      ctx.font = "12px Arial"
-      ctx.fillText(
-        `Alt: ${alt.substring(0, 50)}${alt.length > 50 ? "..." : ""}`,
-        canvas.width / 2,
-        canvas.height / 2 + 20,
-      )
-    }
-
-    // Add source URL if available
-    const src = imgElement.getAttribute("src")
-    if (src) {
-      ctx.font = "10px Arial"
-      const displaySrc = src.length > 40 ? src.substring(0, 37) + "..." : src
-      ctx.fillText(displaySrc, canvas.width / 2, canvas.height / 2 + 40)
-    }
-
-    // Convert to data URL and process
-    const dataUrl = canvas.toDataURL("image/png")
-    addLog("Created placeholder image from HTML tag")
-
-    // Process this image
-    processPlaceholderImage(dataUrl, width, height)
-  }
 
   const createPlaceholderForFailedImage = (imageUrl: string): Promise<string> => {
     if (!isBrowser) return Promise.resolve('')
@@ -400,69 +328,11 @@ export default function ImageProcessor() {
     })
   }
 
-  const processPlaceholderImage = (dataUrl: string, width: number, height: number) => {
-    // Create a new canvas for the final 1500x1500 image
-    const canvas = canvasRef.current
-    if (!canvas) {
-      addLog("Canvas reference not available")
-      return
-    }
-
-    // Set canvas size to 1500x1500
-    canvas.width = 1500
-    canvas.height = 1500
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    if (!ctx) {
-      addLog("Failed to get canvas context")
-      return
-    }
-
-    // Fill canvas with white background
-    ctx.fillStyle = "white"
-    ctx.fillRect(0, 0, 1500, 1500)
-
-    // Create an image from the data URL
-    const img = new Image()
-    img.onload = () => {
-      // Determine if image is portrait, landscape, or square based on original dimensions
-      const isPortrait = height > width
-      const isLandscape = width > height
-      const isSquare = width === height
-
-      addLog(
-        `Processing placeholder with orientation: ${isPortrait ? "portrait" : isLandscape ? "landscape" : "square"}`,
-      )
-
-      if (isSquare) {
-        // Square image
-        ctx.drawImage(img, 0, 0, 1500, 1500)
-      } else if (isLandscape) {
-        // Landscape image - take full width
-        const newHeight = (img.height * 1500) / img.width
-        const y = (1500 - newHeight) / 2
-        ctx.drawImage(img, 0, y, 1500, newHeight)
-      } else {
-        // Portrait image - take full height
-        const newWidth = (img.width * 1500) / img.height
-        const x = (1500 - newWidth) / 2
-        ctx.drawImage(img, x, 0, newWidth, 1500)
-      }
-
-      // Convert canvas to data URL
-      const finalDataUrl = canvas.toDataURL("image/png")
-      addLog("Placeholder image processing completed successfully")
-      setProcessedImages([{ id: nextImageId.current++, url: finalDataUrl, sourceUrl: dataUrl, whiteBackground: false, hasWhitePadding: false, trimPadding: false, isPlaceholder: true, version: 0 }])
-    }
-
-    img.src = dataUrl
-  }
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files)
       // Allow picking the same file again later
       e.target.value = ""
-      setLogs([])
 
       addLog(`Uploaded ${files.length} file(s)`)
       files.forEach((file) => {
@@ -523,7 +393,6 @@ export default function ImageProcessor() {
       toast.info(`Skipped ${skippedCount} non-image file(s)`);
     }
 
-    setLogs([]);
 
     addLog(`Uploaded ${imageFiles.length} file(s) via drag and drop`);
     imageFiles.forEach((file) => {
@@ -541,21 +410,6 @@ export default function ImageProcessor() {
     setUploadedFiles((prev) => [...prev, ...files.map((file, index) => ({ file, url: fileUrls[index] }))])
     files.forEach((file, index) => imageUrlToFilename.current.set(fileUrls[index], file.name))
     processImages(fileUrls)
-  }
-
-  const resolveUrl = (url: string, base: string): string => {
-    try {
-      // If it's already an absolute URL, return it
-      if (url.startsWith("http")) {
-        return url
-      }
-
-      // Handle relative URLs
-      return new URL(url, base).toString()
-    } catch (e) {
-      addLog(`Error resolving URL ${url} with base ${base}: ${e}`)
-      return url
-    }
   }
 
   /**
