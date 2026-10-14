@@ -19,8 +19,7 @@
     "test:coverage": "jest --coverage --config config/jest/jest.config.js",
     "test:e2e": "playwright test --config config/playwright/playwright.config.ts",
     "docker:dev": "docker compose -f docker/docker-compose-dev.yml up --build",
-    "docker:dev:down": "docker compose -f docker/docker-compose-dev.yml down",
-    "update-lockfile": "./scripts/update-lockfile.sh"
+    "docker:dev:down": "docker compose -f docker/docker-compose-dev.yml down"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.4.1",

@@ -110,7 +110,7 @@ A single Next.js application:
 |----------|--------|-------------|------------|
 | `/api/images` | POST | Save a processed image | 300 req/min |
 | `/api/proxy` | GET | Proxy for fetching images to avoid CORS issues | 500 req/min |
-| `/api/serve-image` | GET | Serve processed images from the server | none |
+| `/api/serve-image` | GET | Serve processed images from the server | — |
 | `/api/cleanup` | GET | Delete uploads older than `maxAge` minutes (default 60); requires `?key=<CLEANUP_API_KEY>` | 5 req/min |
 | `/api/healthcheck` | GET | Check if the application is running | 30 req/min |
 
@@ -194,10 +194,6 @@ If Docker healthchecks fail:
 1. Check container logs: `docker logs nextjs-image-processor`
 2. Verify the application is running: `curl http://localhost:6060/api/healthcheck`
 3. Restart the container: `docker compose restart app`
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🙏 Acknowledgements
 
