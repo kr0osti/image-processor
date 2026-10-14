@@ -46,6 +46,18 @@ interface FetchResult {
   logs?: string[];
 }
 
+interface ProcessedImage {
+  url: string;
+  // Source image the result was rendered from, kept so it can be reprocessed
+  sourceUrl: string;
+  // Whether the white-background (padded) layout was applied
+  whiteBackground: boolean;
+  // Placeholders for images that failed to load can't be reprocessed
+  isPlaceholder: boolean;
+  // Bumped on each reprocess to bust the browser cache (the server reuses the filename)
+  version: number;
+}
+
 export default function ImageProcessor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -53,7 +65,8 @@ export default function ImageProcessor() {
   const [baseUrl, setBaseUrl] = useState("https://zhik.com")
   const [useCustomBaseUrl, setUseCustomBaseUrl] = useState(false)
   const [imageUrls, setImageUrls] = useState<string[]>([])
-  const [processedImages, setProcessedImages] = useState<string[]>([])
+  const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([])
+  const [reprocessingIndex, setReprocessingIndex] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
@@ -427,7 +440,7 @@ export default function ImageProcessor() {
       // Convert canvas to data URL
       const finalDataUrl = canvas.toDataURL("image/png")
       addLog("Placeholder image processing completed successfully")
-      setProcessedImages([finalDataUrl])
+      setProcessedImages([{ url: finalDataUrl, sourceUrl: dataUrl, whiteBackground: false, isPlaceholder: true, version: 0 }])
     }
 
     img.src = dataUrl
@@ -436,6 +449,7 @@ export default function ImageProcessor() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files)
+      revokeBlobUrls(imageUrls)
       setUploadedFiles(files)
       setProcessedImages([])
       setLogs([])
@@ -510,6 +524,7 @@ export default function ImageProcessor() {
       toast.info(`Skipped ${skippedCount} non-image file(s)`);
     }
 
+    revokeBlobUrls(imageUrls);
     setUploadedFiles(imageFiles);
     setProcessedImages([]);
     setLogs([]);
@@ -651,43 +666,70 @@ export default function ImageProcessor() {
     }
   }
 
+  /**
+   * Runs one source image through the canvas pipeline and saves it to the server.
+   *
+   * @param {string} imageUrl - The source image URL (remote URL or blob URL)
+   * @param {boolean} [whiteBackgroundOverride] - Force the white-background layout on or off instead of auto-detecting it
+   * @param {boolean} [allowPlaceholder=true] - Save a placeholder when the source image fails to load
+   * @returns {Promise<ProcessedImage|null>} The saved image, or null if it could not be processed or saved
+   */
+  const processAndSaveImage = async (
+    imageUrl: string,
+    whiteBackgroundOverride?: boolean,
+    allowPlaceholder = true,
+  ): Promise<ProcessedImage | null> => {
+    const result = await processImageWithCanvas(imageUrl, whiteBackgroundOverride)
+    let processedImage = result?.dataUrl ?? null
+    const isPlaceholder = !result
+
+    // If image processing failed, create a placeholder
+    if (!processedImage && allowPlaceholder) {
+      addLog(`Creating placeholder for failed image: ${imageUrl}`)
+      const placeholderDataUrl = await createPlaceholderForFailedImage(imageUrl)
+      if (placeholderDataUrl) {
+        // Process the placeholder with the same rules
+        processedImage = await processPlaceholderAsImage(placeholderDataUrl)
+        addLog(`Successfully created and processed placeholder for ${imageUrl}`)
+      }
+    }
+
+    if (!processedImage) return null
+
+    // Compress the image data before sending to server
+    const compressedImage = await compressImageDataUrl(processedImage)
+    addLog(`Compressed image from ${Math.round(processedImage.length / 1024)} KB to ${Math.round(compressedImage.length / 1024)} KB`)
+
+    // Get original filename if available
+    const originalFilename = imageUrlToFilename.get(imageUrl)
+
+    // Convert data URL to real URL
+    const realUrl = await convertDataUrlToRealUrl(compressedImage, originalFilename)
+    if (realUrl === null) return null
+
+    return {
+      url: realUrl,
+      sourceUrl: imageUrl,
+      whiteBackground: result?.whiteBackground ?? false,
+      isPlaceholder,
+      version: 0,
+    }
+  }
+
   const processImages = async (urls: string[]) => {
     setProcessing(true)
     addLog(`Starting to process ${urls.length} images`)
-    const processed: string[] = []
+    const processed: ProcessedImage[] = []
 
     for (const [index, imageUrl] of urls.entries()) {
       try {
         addLog(`Processing image ${index + 1}: ${imageUrl}`)
-        let processedImage = await processImageWithCanvas(imageUrl)
-
-        // If image processing failed, create a placeholder
-        if (!processedImage) {
-          addLog(`Creating placeholder for failed image ${index + 1}`)
-          const placeholderDataUrl = await createPlaceholderForFailedImage(imageUrl)
-          if (placeholderDataUrl) {
-            // Process the placeholder with the same rules
-            processedImage = await processPlaceholderAsImage(placeholderDataUrl)
-            addLog(`Successfully created and processed placeholder for image ${index + 1}`)
-          }
-        }
-
+        const processedImage = await processAndSaveImage(imageUrl)
         if (processedImage) {
-          // Compress the image data before sending to server
-          const compressedImage = await compressImageDataUrl(processedImage)
-          addLog(`Compressed image ${index + 1} from ${Math.round(processedImage.length / 1024)} KB to ${Math.round(compressedImage.length / 1024)} KB`)
-
-          // Get original filename if available
-          const originalFilename = imageUrlToFilename.get(imageUrl)
-
-          // Convert data URL to real URL
-          const realUrl = await convertDataUrlToRealUrl(compressedImage, originalFilename)
-          if (realUrl !== null) {
-            processed.push(realUrl)
-            addLog(`Successfully processed image ${index + 1}`)
-          } else {
-            addLog(`Failed to process image ${index + 1}`)
-          }
+          processed.push(processedImage)
+          addLog(`Successfully processed image ${index + 1}`)
+        } else {
+          addLog(`Failed to process image ${index + 1}`)
         }
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error"
@@ -698,16 +740,44 @@ export default function ImageProcessor() {
     addLog(`Completed processing. Successfully processed ${processed.length} of ${urls.length} images`)
     setProcessedImages(processed)
     setProcessing(false)
+    // Blob URLs are kept alive so images can be reprocessed; they are revoked on
+    // the next upload or when all files are deleted.
+  }
 
-    // Clean up object URLs when done
-    if (uploadedFiles.length > 0) {
-      urls.forEach((url) => {
-        if (url.startsWith("blob:")) {
-          URL.revokeObjectURL(url)
-        }
-      })
-      addLog("Cleaned up object URLs")
+  // Re-run processing for a single image with the white-background layout forced on or off
+  const reprocessImage = async (index: number, whiteBackground: boolean) => {
+    const target = processedImages[index]
+    if (!target || target.isPlaceholder) return
+
+    setReprocessingIndex(index)
+    addLog(`Reprocessing image ${index + 1} with white background ${whiteBackground ? "on" : "off"}`)
+
+    try {
+      // No placeholder fallback: it would overwrite the existing result on the server
+      const result = await processAndSaveImage(target.sourceUrl, whiteBackground, false)
+      if (result) {
+        setProcessedImages((prev) =>
+          prev.map((img, i) => (i === index ? { ...result, version: img.version + 1 } : img)),
+        )
+      } else {
+        toast.error(`Failed to reprocess image ${index + 1}`)
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      addLog(`Error reprocessing image ${index + 1}: ${errorMessage}`)
+      toast.error(`Failed to reprocess image ${index + 1}`)
+    } finally {
+      setReprocessingIndex(null)
     }
+  }
+
+  // Revoke blob URLs from a previous upload before replacing them
+  const revokeBlobUrls = (urls: string[]) => {
+    urls.forEach((url) => {
+      if (url.startsWith("blob:")) {
+        URL.revokeObjectURL(url)
+      }
+    })
   }
 
   const processPlaceholderAsImage = (dataUrl: string): Promise<string | null> => {
@@ -771,7 +841,10 @@ export default function ImageProcessor() {
     return `/api/proxy?url=${encodeURIComponent(imageUrl)}`;
   };
 
-  const processImageWithCanvas = (imageUrl: string): Promise<string | null> => {
+  const processImageWithCanvas = (
+    imageUrl: string,
+    whiteBackgroundOverride?: boolean,
+  ): Promise<{ dataUrl: string; whiteBackground: boolean } | null> => {
     if (!isBrowser) return Promise.resolve(null)
 
     return new Promise((resolve) => {
@@ -808,9 +881,11 @@ export default function ImageProcessor() {
         ctx.fillStyle = "white"
         ctx.fillRect(0, 0, 1500, 1500)
 
-        // Determine if image has white background
-        const hasWhiteBackground = detectWhiteBorder(img, ctx)
-        addLog(`Image background detection: ${hasWhiteBackground ? "White background" : "No white background"}`)
+        // Determine if image has white background, unless the user forced it on or off
+        const hasWhiteBackground = whiteBackgroundOverride ?? detectWhiteBorder(img, ctx)
+        addLog(
+          `Image background ${whiteBackgroundOverride === undefined ? "detection" : "override"}: ${hasWhiteBackground ? "White background" : "No white background"}`,
+        )
 
         // Process image based on orientation and background
         if (hasWhiteBackground) {
@@ -853,7 +928,7 @@ export default function ImageProcessor() {
         // Convert canvas to data URL
         const dataUrl = canvas.toDataURL("image/png")
         addLog("Image processing completed successfully")
-        resolve(dataUrl)
+        resolve({ dataUrl, whiteBackground: hasWhiteBackground })
       }
 
       img.onerror = (e) => {
@@ -1011,7 +1086,7 @@ export default function ImageProcessor() {
     addLog(`Downloading all ${processedImages.length} processed images`)
     processedImages.forEach((img, index) => {
       setTimeout(() => {
-        downloadImage(img, index + 1)
+        downloadImage(img.url, index + 1)
       }, index * 500) // Stagger downloads to prevent browser issues
     })
   }
@@ -1028,7 +1103,7 @@ export default function ImageProcessor() {
 
       // Process each image and add to the zip
       for (let index = 0; index < processedImages.length; index++) {
-        const imageUrl = processedImages[index]
+        const imageUrl = processedImages[index].url
         addLog(`Processing image ${index + 1} for zip: ${imageUrl.substring(0, 50)}...`)
 
         let blob: Blob
@@ -1117,11 +1192,7 @@ export default function ImageProcessor() {
 
   const deleteAllFiles = () => {
     // Clean up object URLs
-    imageUrls.forEach((url) => {
-      if (url.startsWith("blob:")) {
-        URL.revokeObjectURL(url)
-      }
-    })
+    revokeBlobUrls(imageUrls)
 
     // Reset all file-related state
     setUploadedFiles([])
@@ -1580,19 +1651,37 @@ export default function ImageProcessor() {
                     <div className="relative h-[300px] w-full bg-gray-100">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={img || "/placeholder.svg"}
+                        src={img.url ? `${img.url}${img.version ? `${img.url.includes("?") ? "&" : "?"}v=${img.version}` : ""}` : "/placeholder.svg"}
                         alt={`Processed image ${index + 1}`}
                         className="object-contain w-full h-full"
                       />
+                      {reprocessingIndex === index && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/60">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      )}
                     </div>
+                    {!img.isPlaceholder && (
+                      <div className="px-3 pt-3 flex items-center space-x-2">
+                        <Switch
+                          id={`white-bg-${index}`}
+                          checked={img.whiteBackground}
+                          disabled={processing || reprocessingIndex !== null}
+                          onCheckedChange={(checked) => reprocessImage(index, checked)}
+                        />
+                        <Label htmlFor={`white-bg-${index}`} className="text-sm">
+                          White background (padded)
+                        </Label>
+                      </div>
+                    )}
                     <div className="p-3 flex justify-between items-center">
                       <span className="text-sm text-gray-500">Image {index + 1}</span>
                       <div className="flex space-x-2">
-                        <Button size="sm" variant="outline" onClick={() => copyImageUrl(img)}>
+                        <Button size="sm" variant="outline" onClick={() => copyImageUrl(img.url)}>
                           <Copy className="h-4 w-4 mr-2" />
                           Copy URL
                         </Button>
-                        <Button size="sm" onClick={() => downloadImage(img, index + 1)}>
+                        <Button size="sm" onClick={() => downloadImage(img.url, index + 1)}>
                           <Download className="h-4 w-4 mr-2" />
                           Download
                         </Button>
