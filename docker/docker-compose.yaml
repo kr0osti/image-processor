@@ -20,7 +20,6 @@ services:
       - CLEANUP_API_KEY=${CLEANUP_API_KEY}
       - CLEANUP_CRON_SCHEDULE=${CLEANUP_CRON_SCHEDULE:-*/30 * * * *}
     volumes:
-      - ./custom-icons:/app/public/custom-icons
       - ./public/uploads:/app/public/uploads
     healthcheck:
       test: ["CMD-SHELL", "echo 'Debug setting:' $NEXT_PUBLIC_DEBUG && curl -f http://localhost:3000/api/healthcheck || exit 1"]
