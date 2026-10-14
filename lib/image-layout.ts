@@ -62,8 +62,8 @@ export const countWhitePixels = (data: ArrayLike<number>): { white: number; tota
 /**
  * Whether the sampled counts describe a predominantly white background.
  */
-export const isWhiteBackground = (white: number, total: number): boolean =>
-  total > 0 && white / total > WHITE_RATIO_THRESHOLD
+export const isWhiteBackground = (white: number, total: number, threshold: number = WHITE_RATIO_THRESHOLD): boolean =>
+  total > 0 && white / total > threshold
 
 /**
  * Uses the user's override when set, otherwise runs detection.
@@ -151,3 +151,15 @@ export const computeDrawRect = (
   const width = (imageWidth * size) / imageHeight
   return { x: (size - width) / 2, y: 0, width, height: size }
 }
+
+// Upscaling beyond this factor triggers the low-resolution warning (small margin for rounding)
+export const UPSCALE_WARNING_THRESHOLD = 1.01
+
+/**
+ * How much the source is enlarged to fill its draw rect. Values above 1 mean the
+ * source is smaller than its area on the output canvas and will look softer.
+ */
+export const getUpscaleFactor = (sourceWidth: number, sourceHeight: number, rect: Rect): number =>
+  Math.max(rect.width / sourceWidth, rect.height / sourceHeight)
+
+export const isUpscaled = (factor: number): boolean => factor > UPSCALE_WARNING_THRESHOLD

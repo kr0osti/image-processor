@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Link from "next/link"
 import { useTheme } from 'next-themes'
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { Monitor, Moon, Settings, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const THEMES = ['system', 'light', 'dark'] as const
@@ -54,7 +54,16 @@ export function SiteHeader() {
           </span>
           <span className="text-sm">{name}</span>
         </Link>
-        <ThemeToggle />
+        <nav className="flex items-center gap-1">
+          <Button asChild variant="ghost" size="sm" className="h-9 rounded-full px-3">
+            <Link href="/settings">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Settings</span>
+              <span className="sr-only sm:hidden">Settings</span>
+            </Link>
+          </Button>
+          <ThemeToggle />
+        </nav>
       </div>
     </header>
   )

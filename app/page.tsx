@@ -24,6 +24,7 @@ import {
 import { ImageMetadata } from "./actions"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
+import { readSettingsCookie } from "@/lib/settings"
 import {
   BOUNDS_SCAN_SIZE,
   computeDrawRect,
@@ -34,6 +35,8 @@ import {
   isWhiteBackground,
   resolveWhiteBackground,
   scaleBounds,
+  getUpscaleFactor,
+  isUpscaled,
   type Rect,
 } from "@/lib/image-layout"
 
@@ -66,6 +69,10 @@ interface ProcessedImage {
   isPlaceholder: boolean;
   // Bumped on each reprocess to bust the browser cache (the server reuses the filename)
   version: number;
+  // Size of the (possibly trimmed) source that was laid out, and how much it was enlarged
+  sourceWidth: number;
+  sourceHeight: number;
+  upscale: number;
 }
 
 interface ProcessOptions {
@@ -562,6 +569,9 @@ export default function ImageProcessor() {
       trimPadding: result?.trimmed ?? false,
       isPlaceholder,
       version: 0,
+      sourceWidth: result?.sourceWidth ?? 0,
+      sourceHeight: result?.sourceHeight ?? 0,
+      upscale: result?.upscale ?? 1,
     }
   }
 
@@ -587,6 +597,14 @@ export default function ImageProcessor() {
     }
 
     addLog(`Completed processing. Successfully processed ${processed.length} of ${urls.length} images`)
+    const lowRes = processed.filter((img) => !img.isPlaceholder && isUpscaled(img.upscale)).length
+    if (lowRes > 0) {
+      toast.warning(
+        lowRes === 1
+          ? "1 image is smaller than the output and was upscaled. It may look blurry."
+          : `${lowRes} images are smaller than the output and were upscaled. They may look blurry.`,
+      )
+    }
     // Append to earlier results instead of replacing them
     setProcessedImages((prev) => [...prev, ...processed])
     setProcessing(false)
@@ -704,7 +722,15 @@ export default function ImageProcessor() {
   const processImageWithCanvas = (
     imageUrl: string,
     options: ProcessOptions = {},
-  ): Promise<{ dataUrl: string; whiteBackground: boolean; hasWhitePadding: boolean; trimmed: boolean } | null> => {
+  ): Promise<{
+    dataUrl: string
+    whiteBackground: boolean
+    hasWhitePadding: boolean
+    trimmed: boolean
+    sourceWidth: number
+    sourceHeight: number
+    upscale: number
+  } | null> => {
     if (!isBrowser) return Promise.resolve(null)
 
     return new Promise((resolve) => {
@@ -741,8 +767,14 @@ export default function ImageProcessor() {
         ctx.fillStyle = "white"
         ctx.fillRect(0, 0, 1500, 1500)
 
+        // Padding and detection threshold from the settings page, read fresh for every image
+        const settings = readSettingsCookie()
+
         // Determine if image has white background, unless the user forced it on or off
-        const hasWhiteBackground = resolveWhiteBackground(options.whiteBackground, () => detectWhiteBorder(img))
+        const hasWhiteBackground = resolveWhiteBackground(
+          options.whiteBackground,
+          () => detectWhiteBorder(img, settings.whiteThreshold / 100),
+        )
         addLog(
           `Image background ${options.whiteBackground === undefined ? "detection" : "override"}: ${hasWhiteBackground ? "White background" : "No white background"}`,
         )
@@ -762,14 +794,26 @@ export default function ImageProcessor() {
         }
 
         // Padded for white backgrounds, otherwise fit to full width/height
-        const rect = computeDrawRect(source.width, source.height, hasWhiteBackground)
+        const rect = computeDrawRect(source.width, source.height, hasWhiteBackground, undefined, settings.padding)
         addLog(`Drawing at ${rect.width}x${rect.height}, position: (${rect.x}, ${rect.y})`)
+        const upscale = getUpscaleFactor(source.width, source.height, rect)
+        if (isUpscaled(upscale)) {
+          addLog(`Source ${source.width}x${source.height} is upscaled ${upscale.toFixed(2)}x`)
+        }
         ctx.drawImage(img, source.x, source.y, source.width, source.height, rect.x, rect.y, rect.width, rect.height)
 
         // Convert canvas to data URL
         const dataUrl = canvas.toDataURL("image/png")
         addLog("Image processing completed successfully")
-        resolve({ dataUrl, whiteBackground: hasWhiteBackground, hasWhitePadding, trimmed })
+        resolve({
+          dataUrl,
+          whiteBackground: hasWhiteBackground,
+          hasWhitePadding,
+          trimmed,
+          sourceWidth: source.width,
+          sourceHeight: source.height,
+          upscale,
+        })
       }
 
       img.onerror = (e) => {
@@ -785,7 +829,7 @@ export default function ImageProcessor() {
     })
   }
 
-  const detectWhiteBorder = (img: HTMLImageElement): boolean => {
+  const detectWhiteBorder = (img: HTMLImageElement, threshold: number): boolean => {
     try {
       // Create a temporary canvas to analyze the image
       const tempCanvas = document.createElement("canvas")
@@ -811,7 +855,7 @@ export default function ImageProcessor() {
       }
 
       addLog(`Background detection: ${whitePixelCount}/${totalPixels} white pixels (${(whitePixelCount / totalPixels * 100).toFixed(2)}%)`)
-      return isWhiteBackground(whitePixelCount, totalPixels)
+      return isWhiteBackground(whitePixelCount, totalPixels, threshold)
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
       addLog(`Error in background detection: ${errorMessage}`)
@@ -1548,7 +1592,27 @@ export default function ImageProcessor() {
                     <span className="absolute bottom-2 left-2 rounded-md bg-black/75 px-1.5 py-0.5 font-mono text-[11px] text-white backdrop-blur">
                       #{index + 1}
                     </span>
+                    {!img.isPlaceholder && isUpscaled(img.upscale) && (
+                      <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-amber-400 px-1.5 py-0.5 text-[11px] font-semibold text-amber-950 shadow-sm">
+                        <TriangleAlert className="h-3 w-3" />
+                        Low resolution
+                      </span>
+                    )}
                   </div>
+                  {!img.isPlaceholder && isUpscaled(img.upscale) && (
+                    <div
+                      role="note"
+                      className="flex gap-2 border-t border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-900 dark:text-amber-200"
+                    >
+                      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <p>
+                        Source is only{" "}
+                        <span className="font-mono">{img.sourceWidth}×{img.sourceHeight}</span> px and was upscaled{" "}
+                        <span className="font-mono">{img.upscale.toFixed(1)}×</span>, so it may look blurry. Use a larger
+                        image{img.whiteBackground ? " or increase the padding in Settings" : ""}.
+                      </p>
+                    </div>
+                  )}
                   {!img.isPlaceholder && (
                     <div className="space-y-3 border-t px-4 py-3">
                       <div className="flex items-center justify-between gap-3">

@@ -5,6 +5,8 @@ import {
   getSampleRegions,
   hasSignificantPadding,
   isWhiteBackground,
+  getUpscaleFactor,
+  isUpscaled,
   isWhitePixel,
   resolveWhiteBackground,
   scaleBounds,
@@ -178,5 +180,33 @@ describe('computeDrawRect', () => {
 
   it('gives different layouts when the toggle is flipped', () => {
     expect(computeDrawRect(800, 600, true)).not.toEqual(computeDrawRect(800, 600, false))
+  })
+})
+
+describe('isWhiteBackground with a custom threshold', () => {
+  it('uses the given share instead of the default', () => {
+    expect(isWhiteBackground(71, 100, 0.7)).toBe(true)
+    expect(isWhiteBackground(86, 100, 0.9)).toBe(false)
+  })
+})
+
+describe('computeDrawRect with a custom padding', () => {
+  it('fits white-background images into the smaller or larger content area', () => {
+    expect(computeDrawRect(500, 500, true, 1500, 100)).toEqual({ x: 100, y: 100, width: 1300, height: 1300 })
+    expect(computeDrawRect(500, 500, true, 1500, 0)).toEqual({ x: 0, y: 0, width: 1500, height: 1500 })
+  })
+})
+
+describe('getUpscaleFactor / isUpscaled', () => {
+  it('reports how much a small source is enlarged', () => {
+    const rect = computeDrawRect(500, 500, true)
+    expect(getUpscaleFactor(500, 500, rect)).toBeCloseTo(1.8)
+    expect(isUpscaled(getUpscaleFactor(500, 500, rect))).toBe(true)
+  })
+
+  it('does not flag sources that are scaled down or kept at size', () => {
+    expect(isUpscaled(getUpscaleFactor(3000, 2000, computeDrawRect(3000, 2000, false)))).toBe(false)
+    expect(isUpscaled(getUpscaleFactor(1500, 1500, computeDrawRect(1500, 1500, false)))).toBe(false)
+    expect(isUpscaled(getUpscaleFactor(900, 900, computeDrawRect(900, 900, true)))).toBe(false)
   })
 })
