@@ -1,56 +1,26 @@
 const nextJest = require('next/jest');
 const path = require('path');
 
-// Get the absolute path to the project root
 const projectRoot = path.resolve(__dirname, '../..');
-console.log('Project root:', projectRoot);
 
-const createJestConfig = nextJest({
-  // Provide the path to your Next.js app to load next.config.js and .env files in your test environment
-  dir: projectRoot,
-});
-
-// Add any custom config to be passed to Jest
-// Log the current directory for debugging
-console.log('Current directory:', process.cwd());
+// next/jest loads next.config.js and .env files and configures the SWC transform
+const createJestConfig = nextJest({ dir: projectRoot });
 
 const customJestConfig = {
-  // Disable setupFilesAfterEnv for now to avoid path issues
-
   rootDir: projectRoot,
+  // Component tests need a DOM; API/util tests opt into Node with a `@jest-environment node` docblock
   testEnvironment: 'jest-environment-jsdom',
-  forceExit: true,
-  testMatch: [
-    '**/__tests__/**/*.test.(js|jsx|ts|tsx)',
-    '**/?(*.)+(spec|test).(js|jsx|ts|tsx)',
-  ],
+  testMatch: ['<rootDir>/__tests__/**/*.test.(js|jsx|ts|tsx)'],
   moduleNameMapper: {
-    // Handle module aliases (if you have them in tsconfig.json)
     '^@/(.*)$': '<rootDir>/$1',
   },
-  // Add more setup options before each test is run
-  setupFilesAfterEnv: [
-    process.env.NODE_ENV === "test-node"
-      ? "<rootDir>/__tests__/api/setup.js"
-      : "<rootDir>/config/jest/jest.setup.js"
-  ],
+  setupFilesAfterEnv: ['<rootDir>/config/jest/jest.setup.js'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/', '<rootDir>/e2e/'],
-  transform: {
-    // Use babel-jest to transpile tests with the next/babel preset
-    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
-  },
-  transformIgnorePatterns: [
-    '/node_modules/',
-    '^.+\\.module\\.(css|sass|scss)$',
-  ],
-  collectCoverage: true,
+  // Coverage only when asked for (`pnpm test:coverage`)
   collectCoverageFrom: [
     'app/**/*.{js,jsx,ts,tsx}',
     'lib/**/*.{js,jsx,ts,tsx}',
     '!**/*.d.ts',
-    '!**/node_modules/**',
-    '!**/.next/**',
-    '!**/coverage/**',
   ],
 };
 
