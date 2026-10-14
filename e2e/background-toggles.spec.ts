@@ -116,20 +116,52 @@ test.describe('Processed image toggles', () => {
     await expect(uploads).toHaveCount(2);
     const secondSrc = await page.getByAltText('Processed image 2').getAttribute('src');
 
-    // Removing the first image keeps the second, and drops its uploaded file
+    // Removing the first image keeps the second, drops its uploaded file and deletes its saved file
+    expect((await page.request.get(firstSrc!)).status()).toBe(200);
     await page.getByRole('button', { name: 'Remove image 1' }).click();
     await expect(page.getByRole('heading', { name: 'Processed Images (1)' })).toBeVisible();
     await expect(page.getByAltText('Processed image 1')).toHaveAttribute('src', secondSrc!);
     await expect(uploads).toHaveCount(1);
     await expect(uploads).toContainText(`second-${id}.png`);
+    await expect.poll(async () => (await page.request.get(firstSrc!)).status()).toBe(404);
+    expect((await page.request.get(secondSrc!)).status()).toBe(200);
 
     // The remaining image's switches still act on it
     await page.locator('#white-bg-0').click();
     await expect(page.locator('#white-bg-0')).toBeChecked({ timeout: 30_000 });
 
-    // Delete All clears everything
+    // Delete All clears the page and deletes the saved file on the server
+    const remainingSrc = await page.getByAltText('Processed image 1').getAttribute('src');
+    expect((await page.request.get(remainingSrc!)).status()).toBe(200);
+
     await page.getByRole('button', { name: 'Delete All Files' }).click();
     await expect(page.getByRole('heading', { name: /Processed Images/ })).toHaveCount(0);
     await expect(uploads).toHaveCount(0);
+    await expect(page.getByText('Deleted 1 file from the server')).toBeVisible();
+    expect((await page.request.get(remainingSrc!)).status()).toBe(404);
+  });
+
+  test('removing one of two images saved under the same name keeps the shared file', async ({ page }) => {
+    await page.goto('/');
+
+    const product = await makePng(page, 800, 800, { x: 340, y: 340, width: 120, height: 120, color: 'black' });
+    const name = `same-${Date.now()}.png`;
+    const input = page.locator('input[type="file"]');
+
+    // Both uploads are saved as the same <name>-processed file on the server
+    await input.setInputFiles({ name, mimeType: 'image/png', buffer: product });
+    await expect(page.getByRole('heading', { name: 'Processed Images (1)' })).toBeVisible({ timeout: 60_000 });
+    await input.setInputFiles({ name, mimeType: 'image/png', buffer: product });
+    await expect(page.getByRole('heading', { name: 'Processed Images (2)' })).toBeVisible({ timeout: 60_000 });
+    const src = await page.getByAltText('Processed image 2').getAttribute('src');
+
+    await page.getByRole('button', { name: 'Remove image 1' }).click();
+    await expect(page.getByRole('heading', { name: 'Processed Images (1)' })).toBeVisible();
+    expect((await page.request.get(src!)).status()).toBe(200);
+
+    // Removing the last card that uses it deletes the file
+    await page.getByRole('button', { name: 'Remove image 1' }).click();
+    await expect(page.getByRole('heading', { name: /Processed Images/ })).toHaveCount(0);
+    await expect.poll(async () => (await page.request.get(src!)).status()).toBe(404);
   });
 });

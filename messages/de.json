@@ -79,7 +79,10 @@
       "dropImagesOnly": "Bitte nur Bilddateien ablegen",
       "skippedFiles": "{count, plural, one {# Datei übersprungen (kein Bild)} other {# Dateien übersprungen (keine Bilder)}}",
       "upscaled": "{count, plural, one {# Bild ist kleiner als das Ausgabeformat und wurde vergrößert. Es kann unscharf wirken.} other {# Bilder sind kleiner als das Ausgabeformat und wurden vergrößert. Sie können unscharf wirken.}}",
-      "reprocessFailed": "Bild {index} konnte nicht erneut bearbeitet werden"
+      "reprocessFailed": "Bild {index} konnte nicht erneut bearbeitet werden",
+      "filesDeleted": "{count, plural, one {# Datei vom Server gelöscht} other {# Dateien vom Server gelöscht}}",
+      "deleteFailed": "Nicht alle Dateien konnten vom Server gelöscht werden. Die übrigen werden bei der geplanten Bereinigung entfernt.",
+      "removeFailed": "Das Bild konnte nicht vom Server gelöscht werden. Es wird bei der geplanten Bereinigung entfernt."
     },
     "errors": {
       "fetchFailed": "Beim Abrufen der Bilder ist ein Fehler aufgetreten: {message}",

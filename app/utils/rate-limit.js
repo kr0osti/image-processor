@@ -42,8 +42,8 @@ function cleanupStore() {
   });
 }
 
-// Run cleanup every 5 minutes
-setInterval(cleanupStore, 5 * 60 * 1000);
+// Run cleanup every 5 minutes; unref() so the timer never keeps a process (e.g. Jest) alive
+setInterval(cleanupStore, 5 * 60 * 1000).unref?.();
 
 /**
  * Creates a rate limiter middleware for Next.js API routes

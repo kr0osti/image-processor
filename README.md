@@ -12,6 +12,7 @@ A powerful web application that allows you to download, process, and standardize
 - **Languages**: English, French, Spanish and German, picked from the browser language or the header switcher
 - **Light & Dark Themes**: Follows the system setting, with a toggle in the header
 - **Download Options**: Download individual images or as a ZIP archive
+- **Deleting**: The ✕ on a processed image and "Delete All Files" also delete the saved files from the server; files saved before a restart (without `UPLOAD_TOKEN_SECRET`) are left to the cleanup job
 - **CORS Handling**: Creates placeholders for images that can't be loaded due to CORS restrictions
 - **Automatic Cleanup**: A background job deletes processed files on the `CLEANUP_CRON_SCHEDULE` (by default every 30 minutes, removing files older than one interval)
 - **Rate Limiting**: The API endpoints are rate limited per client IP to prevent abuse (see the table below)
@@ -75,6 +76,7 @@ Customize the application by setting these environment variables in your `.env` 
 | `CLEANUP_API_KEY` | API key for `/api/cleanup` (**required**: the endpoint returns 500 when it is unset) | (none) |
 | `CLEANUP_CRON_SCHEDULE` | Cron schedule for the cleanup job; files older than one interval are deleted | */30 * * * * |
 | `NEXT_PUBLIC_DEBUG` | Enable debug logging | false |
+| `UPLOAD_TOKEN_SECRET` | Key for signing delete tokens. Optional; without it a random key is used, so tokens issued before a restart stop working (those files are still removed by the cleanup job) | (random per start) |
 | `ALLOWED_DEV_ORIGINS` | Comma-separated hosts allowed to open `next dev` from another machine (e.g. a LAN IP) | (none) |
 
 ### Translations
@@ -116,7 +118,8 @@ A single Next.js application:
 
 | Endpoint | Method | Description | Rate Limit |
 |----------|--------|-------------|------------|
-| `/api/images` | POST | Save a processed image | 300 req/min |
+| `/api/images` | POST | Save a processed image; returns its `filename` and a `deleteToken` | 300 req/min |
+| `/api/images` | DELETE | Delete saved images: `{ files: [{ filename, token }] }`, each with the token returned when it was saved | 30 req/min |
 | `/api/proxy` | GET | Proxy for fetching images to avoid CORS issues | 500 req/min |
 | `/api/serve-image` | GET | Serve processed images from the server | — |
 | `/api/cleanup` | GET | Delete uploads older than `maxAge` minutes (default 60); requires `?key=<CLEANUP_API_KEY>` | 5 req/min |

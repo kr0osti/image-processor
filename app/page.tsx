@@ -74,6 +74,15 @@ interface ProcessedImage {
   sourceWidth: number;
   sourceHeight: number;
   upscale: number;
+  // Server-side name of the saved file and the token that allows deleting it
+  filename: string | null;
+  deleteToken: string | null;
+}
+
+interface SavedImage {
+  url: string;
+  filename: string | null;
+  deleteToken: string | null;
 }
 
 interface ProcessOptions {
@@ -474,7 +483,7 @@ export default function ImageProcessor() {
    * @param {string} [originalFilename] - Optional original filename to use for the processed file
    * @returns {Promise<string|null>} A promise that resolves to the URL of the saved image, or null if an error occurred
    */
-  const convertDataUrlToRealUrl = async (dataUrl: string, originalFilename?: string): Promise<string | null> => {
+  const convertDataUrlToRealUrl = async (dataUrl: string, originalFilename?: string): Promise<SavedImage | null> => {
     try {
       // Create an AbortController to handle timeouts
       const controller = new AbortController();
@@ -503,7 +512,7 @@ export default function ImageProcessor() {
       if (data.success) {
         // Return the API URL which should work more reliably
         addLog(`Image successfully saved to server`)
-        return data.apiUrl || data.url;
+        return { url: data.apiUrl || data.url, filename: data.filename ?? null, deleteToken: data.deleteToken ?? null };
       } else {
         throw new Error(data.message || 'Failed to save image');
       }
@@ -559,12 +568,12 @@ export default function ImageProcessor() {
     const originalFilename = imageUrlToFilename.current.get(imageUrl)
 
     // Convert data URL to real URL
-    const realUrl = await convertDataUrlToRealUrl(compressedImage, originalFilename)
-    if (realUrl === null) return null
+    const saved = await convertDataUrlToRealUrl(compressedImage, originalFilename)
+    if (saved === null) return null
 
     return {
       id: nextImageId.current++,
-      url: realUrl,
+      url: saved.url,
       sourceUrl: imageUrl,
       whiteBackground: result?.whiteBackground ?? false,
       hasWhitePadding: result?.hasWhitePadding ?? false,
@@ -574,6 +583,8 @@ export default function ImageProcessor() {
       sourceWidth: result?.sourceWidth ?? 0,
       sourceHeight: result?.sourceHeight ?? 0,
       upscale: result?.upscale ?? 1,
+      filename: saved.filename,
+      deleteToken: saved.deleteToken,
     }
   }
 
@@ -1066,31 +1077,82 @@ export default function ImageProcessor() {
   }
 
   // Remove one processed image, and its uploaded file if it came from an upload
-  const removeProcessedImage = (id: number) => {
+  /**
+   * Deletes saved images on the server (DELETE /api/images), using the token
+   * each one was saved with. Returns the counts, or throws if any file could not be deleted.
+   */
+  const deleteServerFiles = async (images: ProcessedImage[]): Promise<{ deleted: number; missing: number }> => {
+    // One entry per server file: images with the same upload name share a file
+    const files = [...new Map(
+      images.flatMap((img) => (img.filename && img.deleteToken ? [[img.filename, img.deleteToken] as const] : [])),
+    )].map(([filename, token]) => ({ filename, token }))
+    if (files.length === 0) return { deleted: 0, missing: 0 }
+
+    const response = await fetch('/api/images', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok || data.rejected > 0) {
+      throw new Error(data.message || `Server responded with ${response.status}`)
+    }
+    return { deleted: data.deleted, missing: data.missing }
+  }
+
+  const removeProcessedImage = async (id: number) => {
     const target = processedImages.find((img) => img.id === id)
     if (!target) return
+    const others = processedImages.filter((img) => img.id !== id)
 
     setProcessedImages((prev) => prev.filter((img) => img.id !== id))
 
     // Only drop the source if no other result was rendered from it
-    if (!processedImages.some((img) => img.id !== id && img.sourceUrl === target.sourceUrl)) {
+    if (!others.some((img) => img.sourceUrl === target.sourceUrl)) {
       revokeBlobUrls([target.sourceUrl])
       setUploadedFiles((prev) => prev.filter((upload) => upload.url !== target.sourceUrl))
     }
     addLog(`Removed processed image: ${target.url}`)
+
+    // Delete the saved file too, unless another card still shows the same server file
+    if (!target.filename || others.some((img) => img.filename === target.filename)) return
+    try {
+      await deleteServerFiles([target])
+      addLog(`Deleted ${target.filename} from the server`)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      addLog(`Error deleting ${target.filename} from the server: ${errorMessage}`)
+      toast.warning(t("toasts.removeFailed"))
+    }
   }
 
-  const deleteAllFiles = () => {
+  const deleteAllFiles = async () => {
+    // Images this session saved on the server
+    const saved = processedImages.filter((img) => img.filename && img.deleteToken)
+
     // Clean up object URLs
     revokeBlobUrls(uploadedFiles.map((upload) => upload.url))
 
-    // Reset all file-related state
+    // Reset all file-related state right away; the server delete runs in the background
     setUploadedFiles([])
     setProcessedImages([])
     setFetchedImages([])
     setSelectedImages([])
 
-    addLog("All files deleted")
+    if (saved.length === 0) {
+      addLog("All files cleared")
+      return
+    }
+
+    try {
+      const { deleted, missing } = await deleteServerFiles(saved)
+      addLog(`Deleted ${deleted} files from the server (${missing} already gone)`)
+      toast.success(t("toasts.filesDeleted", { count: deleted + missing }))
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      addLog(`Error deleting files from the server: ${errorMessage}`)
+      toast.warning(t("toasts.deleteFailed"))
+    }
   }
 
   const processSelectedImages = () => {
