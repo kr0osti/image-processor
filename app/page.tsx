@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { fetchImagesFromUrl } from "./actions"
-import { Loader2, Globe, Upload, AlertTriangle, Info, Download, Trash2, Filter, ChevronDown } from "lucide-react"
+import { Loader2, Globe, Upload, AlertTriangle, Info, Download, Trash2, Filter, ChevronDown, X } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -59,6 +59,8 @@ interface FetchResult {
 }
 
 interface ProcessedImage {
+  // Stable key so removing one image doesn't shift the others
+  id: number;
   url: string;
   // Source image the result was rendered from, kept so it can be reprocessed
   sourceUrl: string;
@@ -93,7 +95,9 @@ export default function ImageProcessor() {
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  // Each uploaded file with the blob URL it is processed from
+  const [uploadedFiles, setUploadedFiles] = useState<{ file: File; url: string }[]>([])
+  const nextImageId = useRef(0)
   const [fetchedImages, setFetchedImages] = useState<string[]>([])
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [imageMetadata, setImageMetadata] = useState<ImageMetadata[]>([])
@@ -212,7 +216,6 @@ export default function ImageProcessor() {
 
     setLoading(true)
     setError("")
-    setProcessedImages([])
     setLogs([])
     setFetchedImages([])
     setFilteredImages([])
@@ -247,13 +250,17 @@ export default function ImageProcessor() {
         setFetchedImages(result.imageUrls)
         setFilteredImages(result.imageUrls)
 
-        // Store filename mapping for fetched images
-        const newMapping = new Map<string, string>()
-        result.imageUrls.forEach((imgUrl, index) => {
-          const filename = metadata[index]?.filename || imgUrl.split("/").pop()?.split("?")[0] || `image-${index + 1}`
-          newMapping.set(imgUrl, filename)
+        // Store filename mapping for fetched images, keeping earlier entries so
+        // previously processed images can still be reprocessed under their name
+        const imageUrls = result.imageUrls
+        setImageUrlToFilename((prev) => {
+          const newMapping = new Map(prev)
+          imageUrls.forEach((imgUrl, index) => {
+            const filename = metadata[index]?.filename || imgUrl.split("/").pop()?.split("?")[0] || `image-${index + 1}`
+            newMapping.set(imgUrl, filename)
+          })
+          return newMapping
         })
-        setImageUrlToFilename(newMapping)
 
         // Load images to determine their sizes
         addLog("Loading images to determine sizes...")
@@ -463,7 +470,7 @@ export default function ImageProcessor() {
       // Convert canvas to data URL
       const finalDataUrl = canvas.toDataURL("image/png")
       addLog("Placeholder image processing completed successfully")
-      setProcessedImages([{ url: finalDataUrl, sourceUrl: dataUrl, whiteBackground: false, hasWhitePadding: false, trimPadding: false, isPlaceholder: true, version: 0 }])
+      setProcessedImages([{ id: nextImageId.current++, url: finalDataUrl, sourceUrl: dataUrl, whiteBackground: false, hasWhitePadding: false, trimPadding: false, isPlaceholder: true, version: 0 }])
     }
 
     img.src = dataUrl
@@ -472,9 +479,8 @@ export default function ImageProcessor() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files)
-      revokeBlobUrls(imageUrls)
-      setUploadedFiles(files)
-      setProcessedImages([])
+      // Allow picking the same file again later
+      e.target.value = ""
       setLogs([])
 
       addLog(`Uploaded ${files.length} file(s)`)
@@ -482,18 +488,7 @@ export default function ImageProcessor() {
         addLog(`File: ${file.name}, Size: ${(file.size / 1024).toFixed(2)} KB, Type: ${file.type}`)
       })
 
-      // Process uploaded files
-      const fileUrls = files.map((file) => URL.createObjectURL(file))
-      addLog(`Created object URLs for ${fileUrls.length} files`)
-      
-      // Store filename mapping
-      const newMapping = new Map<string, string>()
-      files.forEach((file, index) => {
-        newMapping.set(fileUrls[index], file.name)
-      })
-      setImageUrlToFilename(newMapping)
-      
-      setImageUrls(fileUrls)
+      addUploadedFiles(files)
     }
   }
 
@@ -547,9 +542,6 @@ export default function ImageProcessor() {
       toast.info(`Skipped ${skippedCount} non-image file(s)`);
     }
 
-    revokeBlobUrls(imageUrls);
-    setUploadedFiles(imageFiles);
-    setProcessedImages([]);
     setLogs([]);
 
     addLog(`Uploaded ${imageFiles.length} file(s) via drag and drop`);
@@ -557,18 +549,21 @@ export default function ImageProcessor() {
       addLog(`File: ${file.name}, Size: ${(file.size / 1024).toFixed(2)} KB, Type: ${file.type}`);
     });
 
-    // Process uploaded files
-    const fileUrls = imageFiles.map((file) => URL.createObjectURL(file));
-    addLog(`Created object URLs for ${fileUrls.length} files`);
-    
-    // Store filename mapping
-    const newMapping = new Map<string, string>()
-    imageFiles.forEach((file, index) => {
-      newMapping.set(fileUrls[index], file.name)
+    addUploadedFiles(imageFiles);
+  }
+
+  // Queue new uploads for processing; their results are appended to the existing ones
+  const addUploadedFiles = (files: File[]) => {
+    const fileUrls = files.map((file) => URL.createObjectURL(file))
+    addLog(`Created object URLs for ${fileUrls.length} files`)
+
+    setUploadedFiles((prev) => [...prev, ...files.map((file, index) => ({ file, url: fileUrls[index] }))])
+    setImageUrlToFilename((prev) => {
+      const mapping = new Map(prev)
+      files.forEach((file, index) => mapping.set(fileUrls[index], file.name))
+      return mapping
     })
-    setImageUrlToFilename(newMapping)
-    
-    setImageUrls(fileUrls);
+    setImageUrls(fileUrls)
   }
 
   const resolveUrl = (url: string, base: string): string => {
@@ -731,6 +726,7 @@ export default function ImageProcessor() {
     if (realUrl === null) return null
 
     return {
+      id: nextImageId.current++,
       url: realUrl,
       sourceUrl: imageUrl,
       whiteBackground: result?.whiteBackground ?? false,
@@ -763,10 +759,11 @@ export default function ImageProcessor() {
     }
 
     addLog(`Completed processing. Successfully processed ${processed.length} of ${urls.length} images`)
-    setProcessedImages(processed)
+    // Append to earlier results instead of replacing them
+    setProcessedImages((prev) => [...prev, ...processed])
     setProcessing(false)
-    // Blob URLs are kept alive so images can be reprocessed; they are revoked on
-    // the next upload or when all files are deleted.
+    // Blob URLs are kept alive so images can be reprocessed; they are revoked when
+    // the image is removed or when all files are deleted.
   }
 
   // Re-run processing for a single image with one of its settings changed
@@ -790,8 +787,9 @@ export default function ImageProcessor() {
       // No placeholder fallback: it would overwrite the existing result on the server
       const result = await processAndSaveImage(target.sourceUrl, options, false)
       if (result) {
+        // Matched by id, keeping the original id so the card stays in place
         setProcessedImages((prev) =>
-          prev.map((img, i) => (i === index ? { ...result, version: img.version + 1 } : img)),
+          prev.map((img) => (img.id === target.id ? { ...result, id: img.id, version: img.version + 1 } : img)),
         )
       } else {
         toast.error(`Failed to reprocess image ${index + 1}`)
@@ -1197,9 +1195,24 @@ export default function ImageProcessor() {
     }
   }
 
+  // Remove one processed image, and its uploaded file if it came from an upload
+  const removeProcessedImage = (id: number) => {
+    const target = processedImages.find((img) => img.id === id)
+    if (!target) return
+
+    setProcessedImages((prev) => prev.filter((img) => img.id !== id))
+
+    // Only drop the source if no other result was rendered from it
+    if (!processedImages.some((img) => img.id !== id && img.sourceUrl === target.sourceUrl)) {
+      revokeBlobUrls([target.sourceUrl])
+      setUploadedFiles((prev) => prev.filter((upload) => upload.url !== target.sourceUrl))
+    }
+    addLog(`Removed processed image: ${target.url}`)
+  }
+
   const deleteAllFiles = () => {
     // Clean up object URLs
-    revokeBlobUrls(imageUrls)
+    revokeBlobUrls(uploadedFiles.map((upload) => upload.url))
 
     // Reset all file-related state
     setUploadedFiles([])
@@ -1603,8 +1616,8 @@ export default function ImageProcessor() {
                       </Button>
                     </div>
                     <ul className="text-sm text-gray-500 space-y-1">
-                      {uploadedFiles.map((file, index) => (
-                        <li key={index}>
+                      {uploadedFiles.map(({ file, url }) => (
+                        <li key={url}>
                           {file.name} ({(file.size / 1024).toFixed(2)} KB)
                         </li>
                       ))}
@@ -1654,7 +1667,7 @@ export default function ImageProcessor() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {processedImages.map((img, index) => (
-                  <div key={index} className="border rounded-lg overflow-hidden">
+                  <div key={img.id} className="border rounded-lg overflow-hidden">
                     <div className="relative h-[300px] w-full bg-gray-100">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -1667,6 +1680,16 @@ export default function ImageProcessor() {
                           <Loader2 className="h-8 w-8 animate-spin text-primary" />
                         </div>
                       )}
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="absolute top-2 right-2 h-8 w-8"
+                        aria-label={`Remove image ${index + 1}`}
+                        disabled={processing || reprocessingIndex !== null}
+                        onClick={() => removeProcessedImage(img.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
                     {!img.isPlaceholder && (
                       <div className="px-3 pt-3 space-y-2">

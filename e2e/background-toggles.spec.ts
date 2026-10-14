@@ -96,4 +96,40 @@ test.describe('Processed image toggles', () => {
     const [photoCorner] = await samplePixels(page, 'Processed image 2', [[10, 10]]);
     expect(photoCorner).toBeGreaterThan(200);
   });
+  test('new uploads are appended and images can be removed one by one or all at once', async ({ page }) => {
+    await page.goto('/');
+
+    const product = await makePng(page, 800, 800, { x: 340, y: 340, width: 120, height: 120, color: 'black' });
+    const photo = await makePng(page, 800, 600, { x: 0, y: 0, width: 800, height: 600, color: '#c03030' });
+    const id = Date.now();
+    const input = page.locator('input[type="file"]');
+    const uploads = page.locator('li', { hasText: /\.png/ });
+
+    await input.setInputFiles({ name: `first-${id}.png`, mimeType: 'image/png', buffer: product });
+    await expect(page.getByRole('heading', { name: 'Processed Images (1)' })).toBeVisible({ timeout: 60_000 });
+    const firstSrc = await page.getByAltText('Processed image 1').getAttribute('src');
+
+    // A second upload is added after the first instead of replacing it
+    await input.setInputFiles({ name: `second-${id}.png`, mimeType: 'image/png', buffer: photo });
+    await expect(page.getByRole('heading', { name: 'Processed Images (2)' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByAltText('Processed image 1')).toHaveAttribute('src', firstSrc!);
+    await expect(uploads).toHaveCount(2);
+    const secondSrc = await page.getByAltText('Processed image 2').getAttribute('src');
+
+    // Removing the first image keeps the second, and drops its uploaded file
+    await page.getByRole('button', { name: 'Remove image 1' }).click();
+    await expect(page.getByRole('heading', { name: 'Processed Images (1)' })).toBeVisible();
+    await expect(page.getByAltText('Processed image 1')).toHaveAttribute('src', secondSrc!);
+    await expect(uploads).toHaveCount(1);
+    await expect(uploads).toContainText(`second-${id}.png`);
+
+    // The remaining image's switches still act on it
+    await page.locator('#white-bg-0').click();
+    await expect(page.locator('#white-bg-0')).toBeChecked({ timeout: 30_000 });
+
+    // Delete All clears everything
+    await page.getByRole('button', { name: 'Delete All Files' }).click();
+    await expect(page.getByRole('heading', { name: /Processed Images/ })).toHaveCount(0);
+    await expect(uploads).toHaveCount(0);
+  });
 });
