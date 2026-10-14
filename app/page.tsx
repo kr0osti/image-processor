@@ -32,6 +32,18 @@ import { ImageMetadata } from "./actions"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Copy } from "lucide-react"
 import { toast } from "sonner"
+import {
+  BOUNDS_SCAN_SIZE,
+  computeDrawRect,
+  countWhitePixels,
+  findContentBounds,
+  getSampleRegions,
+  hasSignificantPadding,
+  isWhiteBackground,
+  resolveWhiteBackground,
+  scaleBounds,
+  type Rect,
+} from "@/lib/image-layout"
 
 interface FetchResult {
   imageUrls?: string[];
@@ -46,6 +58,29 @@ interface FetchResult {
   logs?: string[];
 }
 
+interface ProcessedImage {
+  url: string;
+  // Source image the result was rendered from, kept so it can be reprocessed
+  sourceUrl: string;
+  // Whether the white-background (padded) layout was applied
+  whiteBackground: boolean;
+  // Whether the source has a significant white margin around its content
+  hasWhitePadding: boolean;
+  // Whether that margin was trimmed before layout
+  trimPadding: boolean;
+  // Placeholders for images that failed to load can't be reprocessed
+  isPlaceholder: boolean;
+  // Bumped on each reprocess to bust the browser cache (the server reuses the filename)
+  version: number;
+}
+
+interface ProcessOptions {
+  // Force the white-background layout on or off instead of auto-detecting it
+  whiteBackground?: boolean;
+  // Crop the source to its non-white content before layout
+  trimPadding?: boolean;
+}
+
 export default function ImageProcessor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -53,7 +88,8 @@ export default function ImageProcessor() {
   const [baseUrl, setBaseUrl] = useState("https://zhik.com")
   const [useCustomBaseUrl, setUseCustomBaseUrl] = useState(false)
   const [imageUrls, setImageUrls] = useState<string[]>([])
-  const [processedImages, setProcessedImages] = useState<string[]>([])
+  const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([])
+  const [reprocessingIndex, setReprocessingIndex] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
@@ -427,7 +463,7 @@ export default function ImageProcessor() {
       // Convert canvas to data URL
       const finalDataUrl = canvas.toDataURL("image/png")
       addLog("Placeholder image processing completed successfully")
-      setProcessedImages([finalDataUrl])
+      setProcessedImages([{ url: finalDataUrl, sourceUrl: dataUrl, whiteBackground: false, hasWhitePadding: false, trimPadding: false, isPlaceholder: true, version: 0 }])
     }
 
     img.src = dataUrl
@@ -436,6 +472,7 @@ export default function ImageProcessor() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files)
+      revokeBlobUrls(imageUrls)
       setUploadedFiles(files)
       setProcessedImages([])
       setLogs([])
@@ -510,6 +547,7 @@ export default function ImageProcessor() {
       toast.info(`Skipped ${skippedCount} non-image file(s)`);
     }
 
+    revokeBlobUrls(imageUrls);
     setUploadedFiles(imageFiles);
     setProcessedImages([]);
     setLogs([]);
@@ -651,43 +689,72 @@ export default function ImageProcessor() {
     }
   }
 
+  /**
+   * Runs one source image through the canvas pipeline and saves it to the server.
+   *
+   * @param {string} imageUrl - The source image URL (remote URL or blob URL)
+   * @param {ProcessOptions} [options] - White-background override and padding trim
+   * @param {boolean} [allowPlaceholder=true] - Save a placeholder when the source image fails to load
+   * @returns {Promise<ProcessedImage|null>} The saved image, or null if it could not be processed or saved
+   */
+  const processAndSaveImage = async (
+    imageUrl: string,
+    options: ProcessOptions = {},
+    allowPlaceholder = true,
+  ): Promise<ProcessedImage | null> => {
+    const result = await processImageWithCanvas(imageUrl, options)
+    let processedImage = result?.dataUrl ?? null
+    const isPlaceholder = !result
+
+    // If image processing failed, create a placeholder
+    if (!processedImage && allowPlaceholder) {
+      addLog(`Creating placeholder for failed image: ${imageUrl}`)
+      const placeholderDataUrl = await createPlaceholderForFailedImage(imageUrl)
+      if (placeholderDataUrl) {
+        // Process the placeholder with the same rules
+        processedImage = await processPlaceholderAsImage(placeholderDataUrl)
+        addLog(`Successfully created and processed placeholder for ${imageUrl}`)
+      }
+    }
+
+    if (!processedImage) return null
+
+    // Compress the image data before sending to server
+    const compressedImage = await compressImageDataUrl(processedImage)
+    addLog(`Compressed image from ${Math.round(processedImage.length / 1024)} KB to ${Math.round(compressedImage.length / 1024)} KB`)
+
+    // Get original filename if available
+    const originalFilename = imageUrlToFilename.get(imageUrl)
+
+    // Convert data URL to real URL
+    const realUrl = await convertDataUrlToRealUrl(compressedImage, originalFilename)
+    if (realUrl === null) return null
+
+    return {
+      url: realUrl,
+      sourceUrl: imageUrl,
+      whiteBackground: result?.whiteBackground ?? false,
+      hasWhitePadding: result?.hasWhitePadding ?? false,
+      trimPadding: result?.trimmed ?? false,
+      isPlaceholder,
+      version: 0,
+    }
+  }
+
   const processImages = async (urls: string[]) => {
     setProcessing(true)
     addLog(`Starting to process ${urls.length} images`)
-    const processed: string[] = []
+    const processed: ProcessedImage[] = []
 
     for (const [index, imageUrl] of urls.entries()) {
       try {
         addLog(`Processing image ${index + 1}: ${imageUrl}`)
-        let processedImage = await processImageWithCanvas(imageUrl)
-
-        // If image processing failed, create a placeholder
-        if (!processedImage) {
-          addLog(`Creating placeholder for failed image ${index + 1}`)
-          const placeholderDataUrl = await createPlaceholderForFailedImage(imageUrl)
-          if (placeholderDataUrl) {
-            // Process the placeholder with the same rules
-            processedImage = await processPlaceholderAsImage(placeholderDataUrl)
-            addLog(`Successfully created and processed placeholder for image ${index + 1}`)
-          }
-        }
-
+        const processedImage = await processAndSaveImage(imageUrl)
         if (processedImage) {
-          // Compress the image data before sending to server
-          const compressedImage = await compressImageDataUrl(processedImage)
-          addLog(`Compressed image ${index + 1} from ${Math.round(processedImage.length / 1024)} KB to ${Math.round(compressedImage.length / 1024)} KB`)
-
-          // Get original filename if available
-          const originalFilename = imageUrlToFilename.get(imageUrl)
-
-          // Convert data URL to real URL
-          const realUrl = await convertDataUrlToRealUrl(compressedImage, originalFilename)
-          if (realUrl !== null) {
-            processed.push(realUrl)
-            addLog(`Successfully processed image ${index + 1}`)
-          } else {
-            addLog(`Failed to process image ${index + 1}`)
-          }
+          processed.push(processedImage)
+          addLog(`Successfully processed image ${index + 1}`)
+        } else {
+          addLog(`Failed to process image ${index + 1}`)
         }
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error"
@@ -698,16 +765,53 @@ export default function ImageProcessor() {
     addLog(`Completed processing. Successfully processed ${processed.length} of ${urls.length} images`)
     setProcessedImages(processed)
     setProcessing(false)
+    // Blob URLs are kept alive so images can be reprocessed; they are revoked on
+    // the next upload or when all files are deleted.
+  }
 
-    // Clean up object URLs when done
-    if (uploadedFiles.length > 0) {
-      urls.forEach((url) => {
-        if (url.startsWith("blob:")) {
-          URL.revokeObjectURL(url)
-        }
-      })
-      addLog("Cleaned up object URLs")
+  // Re-run processing for a single image with one of its settings changed
+  const reprocessImage = async (index: number, changes: ProcessOptions) => {
+    const target = processedImages[index]
+    if (!target || target.isPlaceholder) return
+
+    // Keep the image's current settings, so flipping one switch doesn't reset the other
+    const options: Required<ProcessOptions> = {
+      whiteBackground: target.whiteBackground,
+      trimPadding: target.trimPadding,
+      ...changes,
     }
+
+    setReprocessingIndex(index)
+    addLog(
+      `Reprocessing image ${index + 1}: white background ${options.whiteBackground ? "on" : "off"}, trim padding ${options.trimPadding ? "on" : "off"}`,
+    )
+
+    try {
+      // No placeholder fallback: it would overwrite the existing result on the server
+      const result = await processAndSaveImage(target.sourceUrl, options, false)
+      if (result) {
+        setProcessedImages((prev) =>
+          prev.map((img, i) => (i === index ? { ...result, version: img.version + 1 } : img)),
+        )
+      } else {
+        toast.error(`Failed to reprocess image ${index + 1}`)
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      addLog(`Error reprocessing image ${index + 1}: ${errorMessage}`)
+      toast.error(`Failed to reprocess image ${index + 1}`)
+    } finally {
+      setReprocessingIndex(null)
+    }
+  }
+
+  // Revoke blob URLs from a previous upload before replacing them
+  const revokeBlobUrls = (urls: string[]) => {
+    urls.forEach((url) => {
+      if (url.startsWith("blob:")) {
+        URL.revokeObjectURL(url)
+      }
+    })
   }
 
   const processPlaceholderAsImage = (dataUrl: string): Promise<string | null> => {
@@ -771,7 +875,10 @@ export default function ImageProcessor() {
     return `/api/proxy?url=${encodeURIComponent(imageUrl)}`;
   };
 
-  const processImageWithCanvas = (imageUrl: string): Promise<string | null> => {
+  const processImageWithCanvas = (
+    imageUrl: string,
+    options: ProcessOptions = {},
+  ): Promise<{ dataUrl: string; whiteBackground: boolean; hasWhitePadding: boolean; trimmed: boolean } | null> => {
     if (!isBrowser) return Promise.resolve(null)
 
     return new Promise((resolve) => {
@@ -808,52 +915,35 @@ export default function ImageProcessor() {
         ctx.fillStyle = "white"
         ctx.fillRect(0, 0, 1500, 1500)
 
-        // Determine if image has white background
-        const hasWhiteBackground = detectWhiteBorder(img, ctx)
-        addLog(`Image background detection: ${hasWhiteBackground ? "White background" : "No white background"}`)
+        // Determine if image has white background, unless the user forced it on or off
+        const hasWhiteBackground = resolveWhiteBackground(options.whiteBackground, () => detectWhiteBorder(img))
+        addLog(
+          `Image background ${options.whiteBackground === undefined ? "detection" : "override"}: ${hasWhiteBackground ? "White background" : "No white background"}`,
+        )
 
-        // Process image based on orientation and background
-        if (hasWhiteBackground) {
-          // For small objects on white backgrounds, use more padding
-          // Calculate the actual object size by estimating non-white area
-          const objectSize = Math.max(img.width, img.height)
-          const padding = 300 // Increased padding for small objects
-          const maxSize = 1500 - (padding * 2)
+        // Find the non-white content so a significant white margin can be offered for trimming
+        const contentBounds = detectContentBounds(img)
+        const hasWhitePadding = hasSignificantPadding(contentBounds, img.width, img.height)
+        addLog(`White padding detection: ${hasWhitePadding ? "Significant padding" : "No significant padding"}`)
 
-          // Scale the image to fit within the padded area
-          const scale = maxSize / objectSize
-          const newWidth = img.width * scale
-          const newHeight = img.height * scale
-          const x = (1500 - newWidth) / 2
-          const y = (1500 - newHeight) / 2
-
-          addLog(`Resizing with padding: ${newWidth}x${newHeight}, position: (${x}, ${y})`)
-          ctx.drawImage(img, x, y, newWidth, newHeight)
-        } else {
-          // For images without white background
-          if (img.width === img.height) {
-            // Square image
-            addLog("Processing as square image")
-            ctx.drawImage(img, 0, 0, 1500, 1500)
-          } else if (img.width > img.height) {
-            // Landscape image - take full width
-            const newHeight = (img.height * 1500) / img.width
-            const y = (1500 - newHeight) / 2
-            addLog(`Processing as landscape image: 1500x${newHeight}, y-offset: ${y}`)
-            ctx.drawImage(img, 0, y, 1500, newHeight)
-          } else {
-            // Portrait image - take full height
-            const newWidth = (img.width * 1500) / img.height
-            const x = (1500 - newWidth) / 2
-            addLog(`Processing as portrait image: ${newWidth}x1500, x-offset: ${x}`)
-            ctx.drawImage(img, x, 0, newWidth, 1500)
-          }
+        // Crop to the content when asked to; otherwise use the whole source image
+        const trimmed = !!options.trimPadding && contentBounds !== null
+        const source: Rect = trimmed && contentBounds
+          ? contentBounds
+          : { x: 0, y: 0, width: img.width, height: img.height }
+        if (trimmed) {
+          addLog(`Trimming padding to ${source.width}x${source.height} at (${source.x}, ${source.y})`)
         }
+
+        // Padded for white backgrounds, otherwise fit to full width/height
+        const rect = computeDrawRect(source.width, source.height, hasWhiteBackground)
+        addLog(`Drawing at ${rect.width}x${rect.height}, position: (${rect.x}, ${rect.y})`)
+        ctx.drawImage(img, source.x, source.y, source.width, source.height, rect.x, rect.y, rect.width, rect.height)
 
         // Convert canvas to data URL
         const dataUrl = canvas.toDataURL("image/png")
         addLog("Image processing completed successfully")
-        resolve(dataUrl)
+        resolve({ dataUrl, whiteBackground: hasWhiteBackground, hasWhitePadding, trimmed })
       }
 
       img.onerror = (e) => {
@@ -869,7 +959,7 @@ export default function ImageProcessor() {
     })
   }
 
-  const detectWhiteBorder = (img: HTMLImageElement, ctx: CanvasRenderingContext2D): boolean => {
+  const detectWhiteBorder = (img: HTMLImageElement): boolean => {
     try {
       // Create a temporary canvas to analyze the image
       const tempCanvas = document.createElement("canvas")
@@ -884,55 +974,47 @@ export default function ImageProcessor() {
       // Draw the image on the temporary canvas
       tempCtx.drawImage(img, 0, 0, img.width, img.height)
 
-      // Sample more pixels from the edges for better detection
-      const sampleSize = Math.max(10, Math.floor(Math.min(img.width, img.height) * 0.05))
-
-      // Check if the image has a predominantly white background
-      // Sample pixels from various parts of the image, not just the edges
+      // Sample the edges and the center of the image
       let whitePixelCount = 0
       let totalPixels = 0
-
-      // Sample from edges and interior
-      const regions = [
-        // Edges
-        { x: 0, y: 0, width: img.width, height: sampleSize }, // top
-        { x: 0, y: img.height - sampleSize, width: img.width, height: sampleSize }, // bottom
-        { x: 0, y: sampleSize, width: sampleSize, height: img.height - (2 * sampleSize) }, // left
-        { x: img.width - sampleSize, y: sampleSize, width: sampleSize, height: img.height - (2 * sampleSize) }, // right
-
-        // Sample from center area too
-        { x: img.width * 0.25, y: img.height * 0.25, width: img.width * 0.5, height: img.height * 0.5 }
-      ]
-
-      for (const region of regions) {
+      for (const region of getSampleRegions(img.width, img.height)) {
         const imageData = tempCtx.getImageData(region.x, region.y, region.width, region.height)
-        const data = imageData.data
-
-        for (let i = 0; i < data.length; i += 16) { // Sample every 4th pixel for performance
-          const r = data[i]
-          const g = data[i + 1]
-          const b = data[i + 2]
-          const a = data[i + 3]
-
-          // Consider transparent pixels as white too
-          if ((r > 240 && g > 240 && b > 240) || a < 50) {
-            whitePixelCount++
-          }
-          totalPixels++
-        }
+        const { white, total } = countWhitePixels(imageData.data)
+        whitePixelCount += white
+        totalPixels += total
       }
 
-      // If more than 85% of sampled pixels are white, consider it has a white background
-      const whiteRatio = whitePixelCount / totalPixels
-      addLog(`Background detection: ${whitePixelCount}/${totalPixels} white pixels (${(whiteRatio * 100).toFixed(2)}%)`)
-
-      // For small objects on white backgrounds, we need a higher threshold
-      return whiteRatio > 0.85
+      addLog(`Background detection: ${whitePixelCount}/${totalPixels} white pixels (${(whitePixelCount / totalPixels * 100).toFixed(2)}%)`)
+      return isWhiteBackground(whitePixelCount, totalPixels)
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
       addLog(`Error in background detection: ${errorMessage}`)
       console.error("Error detecting white background:", error)
       return false
+    }
+  }
+
+  // Bounding box of the image's non-white content, scanned on a downscaled copy for speed
+  const detectContentBounds = (img: HTMLImageElement): Rect | null => {
+    try {
+      const scale = Math.min(1, BOUNDS_SCAN_SIZE / Math.max(img.width, img.height))
+      const tempCanvas = document.createElement("canvas")
+      tempCanvas.width = Math.max(1, Math.round(img.width * scale))
+      tempCanvas.height = Math.max(1, Math.round(img.height * scale))
+      const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true })
+      if (!tempCtx) {
+        addLog("Failed to get temporary canvas context for padding detection")
+        return null
+      }
+
+      tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height)
+      const { data } = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height)
+      const bounds = findContentBounds(data, tempCanvas.width, tempCanvas.height)
+      return bounds && scaleBounds(bounds, img.width / tempCanvas.width, img.width, img.height)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      addLog(`Error in padding detection: ${errorMessage}`)
+      return null
     }
   }
 
@@ -1011,7 +1093,7 @@ export default function ImageProcessor() {
     addLog(`Downloading all ${processedImages.length} processed images`)
     processedImages.forEach((img, index) => {
       setTimeout(() => {
-        downloadImage(img, index + 1)
+        downloadImage(img.url, index + 1)
       }, index * 500) // Stagger downloads to prevent browser issues
     })
   }
@@ -1028,7 +1110,7 @@ export default function ImageProcessor() {
 
       // Process each image and add to the zip
       for (let index = 0; index < processedImages.length; index++) {
-        const imageUrl = processedImages[index]
+        const imageUrl = processedImages[index].url
         addLog(`Processing image ${index + 1} for zip: ${imageUrl.substring(0, 50)}...`)
 
         let blob: Blob
@@ -1117,11 +1199,7 @@ export default function ImageProcessor() {
 
   const deleteAllFiles = () => {
     // Clean up object URLs
-    imageUrls.forEach((url) => {
-      if (url.startsWith("blob:")) {
-        URL.revokeObjectURL(url)
-      }
-    })
+    revokeBlobUrls(imageUrls)
 
     // Reset all file-related state
     setUploadedFiles([])
@@ -1580,19 +1658,52 @@ export default function ImageProcessor() {
                     <div className="relative h-[300px] w-full bg-gray-100">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={img || "/placeholder.svg"}
+                        src={img.url ? `${img.url}${img.version ? `${img.url.includes("?") ? "&" : "?"}v=${img.version}` : ""}` : "/placeholder.svg"}
                         alt={`Processed image ${index + 1}`}
                         className="object-contain w-full h-full"
                       />
+                      {reprocessingIndex === index && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/60">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      )}
                     </div>
+                    {!img.isPlaceholder && (
+                      <div className="px-3 pt-3 space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id={`white-bg-${index}`}
+                            checked={img.whiteBackground}
+                            disabled={processing || reprocessingIndex !== null}
+                            onCheckedChange={(checked) => reprocessImage(index, { whiteBackground: checked })}
+                          />
+                          <Label htmlFor={`white-bg-${index}`} className="text-sm">
+                            White background (padded)
+                          </Label>
+                        </div>
+                        {(img.hasWhitePadding || img.trimPadding) && (
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id={`trim-padding-${index}`}
+                              checked={img.trimPadding}
+                              disabled={processing || reprocessingIndex !== null}
+                              onCheckedChange={(checked) => reprocessImage(index, { trimPadding: checked })}
+                            />
+                            <Label htmlFor={`trim-padding-${index}`} className="text-sm">
+                              Trim white padding from source
+                            </Label>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="p-3 flex justify-between items-center">
                       <span className="text-sm text-gray-500">Image {index + 1}</span>
                       <div className="flex space-x-2">
-                        <Button size="sm" variant="outline" onClick={() => copyImageUrl(img)}>
+                        <Button size="sm" variant="outline" onClick={() => copyImageUrl(img.url)}>
                           <Copy className="h-4 w-4 mr-2" />
                           Copy URL
                         </Button>
-                        <Button size="sm" onClick={() => downloadImage(img, index + 1)}>
+                        <Button size="sm" onClick={() => downloadImage(img.url, index + 1)}>
                           <Download className="h-4 w-4 mr-2" />
                           Download
                         </Button>
