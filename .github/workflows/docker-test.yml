@@ -12,6 +12,13 @@ on:
       - 'docker/**'
       - '.github/workflows/docker-test.yml'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test-docker-permissions:
     runs-on: ubuntu-latest
@@ -95,21 +102,26 @@ jobs:
           
           echo "Container started: $CONTAINER_ID"
           
-          # Wait for container to be ready
-          echo "Waiting for container to start..."
-          sleep 10
-          
-          # Check if container is still running
-          if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_ID")" != "true" ]; then
-            echo "✗ Container stopped unexpectedly"
-            docker logs "$CONTAINER_ID"
-            exit 1
-          fi
-          
-          # Test healthcheck endpoint (if it exists)
-          echo "Checking container health..."
-          HEALTH_CHECK=$(docker exec "$CONTAINER_ID" sh -c "curl -f http://localhost:3000/api/healthcheck 2>/dev/null || echo 'healthcheck_not_found'")
+          # Poll the healthcheck endpoint instead of sleeping a fixed time
+          echo "Waiting for /api/healthcheck..."
+          for i in $(seq 1 30); do
+            if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_ID")" != "true" ]; then
+              echo "✗ Container stopped unexpectedly"
+              docker logs "$CONTAINER_ID"
+              exit 1
+            fi
+            if HEALTH_CHECK=$(docker exec "$CONTAINER_ID" curl -fsS http://localhost:3000/api/healthcheck); then
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "✗ Healthcheck did not respond within 60s"
+              docker logs "$CONTAINER_ID"
+              exit 1
+            fi
+            sleep 2
+          done
           echo "Health check response: $HEALTH_CHECK"
+          echo "$HEALTH_CHECK" | grep -q '"status":"ok"' || (echo "✗ Unexpected healthcheck response" && exit 1)
           
           # Stop container
           docker stop "$CONTAINER_ID"
@@ -167,15 +179,21 @@ jobs:
           # Start services
           docker compose -f docker-compose-test.yml up -d
           
-          # Wait for container to start
-          sleep 15
-          
-          # Check if container is running
-          if [ "$(docker inspect -f '{{.State.Running}}' "nextjs-image-processor-test")" != "true" ]; then
-            echo "✗ Container failed to start"
-            docker compose -f docker-compose-test.yml logs
-            exit 1
-          fi
+          # Wait until the app answers instead of sleeping a fixed time
+          for i in $(seq 1 30); do
+            if [ "$(docker inspect -f '{{.State.Running}}' "nextjs-image-processor-test")" != "true" ]; then
+              echo "✗ Container failed to start"
+              docker compose -f docker-compose-test.yml logs
+              exit 1
+            fi
+            curl -fsS http://localhost:3001/api/healthcheck && break
+            if [ "$i" -eq 30 ]; then
+              echo "✗ Healthcheck did not respond within 60s"
+              docker compose -f docker-compose-test.yml logs
+              exit 1
+            fi
+            sleep 2
+          done
           
           # Test that container can write to uploads directory
           echo "Testing write permissions in container..."
