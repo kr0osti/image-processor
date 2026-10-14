@@ -7,6 +7,10 @@ A powerful web application that allows you to download, process, and standardize
 - **Multiple Image Sources**: Upload local files or scrape images from webpages
 - **Intelligent Processing**: Automatically resize and position images to 1500x1500px based on content
 - **Batch Processing**: Process multiple images at once with filtering by size
+- **Adjustable Layout**: A settings page sets the white-background padding (default 150px per side) and the white-detection threshold, saved per browser in a cookie
+- **Low-Resolution Warning**: Images that had to be upscaled are flagged with their source size and upscale factor
+- **Languages**: English, French, Spanish and German, picked from the browser language or the header switcher
+- **Light & Dark Themes**: Follows the system setting, with a toggle in the header
 - **Download Options**: Download individual images or as a ZIP archive
 - **CORS Handling**: Creates placeholders for images that can't be loaded due to CORS restrictions
 - **Automatic Cleanup**: Uploaded files are automatically deleted after 1 hour
@@ -63,6 +67,13 @@ Customize the application by setting these environment variables in your `.env` 
 | `CLEANUP_API_KEY` | API key for the cleanup endpoint | change-this-to-a-secure-key |
 | `CLEANUP_CRON_SCHEDULE` | Cron schedule for the cleanup job | */30 * * * * |
 | `NEXT_PUBLIC_DEBUG` | Enable debug logging | false |
+| `ALLOWED_DEV_ORIGINS` | Comma-separated hosts allowed to open `next dev` from another machine (e.g. a LAN IP) | (none) |
+
+### Translations
+
+UI text lives in `messages/<locale>.json` (`en` is the source; `fr`, `es` and `de` are translations). The active language comes from the `NEXT_LOCALE` cookie, or from the browser's `Accept-Language` header on a first visit.
+
+To update a translation, edit the matching file and keep every key, `{placeholder}` and `<tag>` from `en.json`; `pnpm test` fails if one is missing. Plurals use ICU syntax, e.g. `{count, plural, one {# image} other {# images}}`. To add a language, add its code to `i18n/config.ts` and create `messages/<code>.json`.
 
 ## 🏗️ Architecture
 
