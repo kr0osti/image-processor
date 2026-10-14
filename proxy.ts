@@ -17,7 +17,7 @@ const globalApiRateLimiter = createRateLimiter({
   }
 });
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Only apply rate limiting to API routes
@@ -38,7 +38,7 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Configure the paths that this middleware should run on
+// Configure the paths that this proxy should run on
 export const config = {
   matcher: [
     // Apply to all API routes except healthcheck
