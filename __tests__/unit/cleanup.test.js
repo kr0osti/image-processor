@@ -85,10 +85,6 @@ describe('Cleanup Utility', () => {
     // Act
     const result = await cleanupOldUploads(60 * 60 * 1000); // 1 hour
 
-    // Debug
-    console.log('unlink mock calls:', fsPromises.unlink.mock.calls);
-    console.log('stat mock calls:', fsPromises.stat.mock.calls);
-
     // Assert
     // The actual result is different from what we expected
     // Let's update our expectation to match the actual implementation

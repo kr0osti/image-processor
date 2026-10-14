@@ -1,3 +1,19 @@
+global.Response = class Response {
+  constructor(body, init = {}) {
+    this.body = body;
+    this.status = init.status || 200;
+    this.ok = this.status >= 200 && this.status < 300;
+    this.headers = new global.Headers(init.headers || {});
+  }
+  json() { return Promise.resolve(typeof this.body === 'string' ? JSON.parse(this.body) : this.body); }
+  text() { return Promise.resolve(String(this.body)); }
+};
+global.Response.json = function(data, init = {}) {
+  const body = JSON.stringify(data);
+  const response = new global.Response(body, init);
+  response.headers.set('Content-Type', 'application/json');
+  return response;
+};
 // Mock Next.js Request and Response
 global.Request = class Request {
   constructor(url, options = {}) {
@@ -88,9 +104,14 @@ jest.mock('next/server', () => {
     return new MockNextResponse(body, init);
   });
 
-  NextResponseMock.json = jest.fn((data, options) => {
-    return new MockNextResponse(data, options);
-  });
+  NextResponseMock.json = function(data, options = {}) {
+      const body = JSON.stringify(data);
+      const response = new MockNextResponse(body, options);
+      response.headers.set('Content-Type', 'application/json');
+      response.json = function() { return Promise.resolve(data); };
+      return response;
+  };
+  MockNextResponse.json = NextResponseMock.json;
 
   NextResponseMock.redirect = jest.fn((url) => {
     const response = new MockNextResponse(null, { status: 302 });

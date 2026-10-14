@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRateLimiter } from '../../utils/rate-limit.js';
-import { safeFetch, readBodyWithLimit } from '../../utils/safe-fetch.js';
+import { isSafeUrl, safeFetch, readBodyWithLimit } from '@/lib/ssrf';
 
 // Maximum size of a proxied image (25 MB)
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
@@ -18,9 +18,8 @@ const rateLimiter = createRateLimiter({
  * API route handler for proxying images from external sources
  *
  * This endpoint fetches images from external URLs and serves them through
- * the application's domain to avoid CORS issues. Only public http(s) URLs are
- * fetched (private/internal addresses are rejected, including after redirects),
- * and only raster image responses up to 25 MB are returned.
+ * the application's domain to avoid CORS issues. Only raster image responses
+ * up to 25 MB are returned (SVG, HTML and other types are rejected).
  *
  * Rate limited to 500 requests per minute per IP address.
  *
@@ -41,6 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Security: Use safeFetch to prevent SSRF and validate redirect chain
     const response = await safeFetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: `Failed to fetch image: ${response.statusText}` }, { status: response.status });
     }
 
-    // Only proxy raster images (SVG can carry scripts)
+    // Only proxy raster images: SVG or HTML served from our origin could run scripts
     const contentType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
     if (!contentType.startsWith('image/') || contentType === 'image/svg+xml') {
       return NextResponse.json({ error: 'URL did not return a supported image' }, { status: 415 });
@@ -65,16 +65,37 @@ export async function GET(request: NextRequest) {
 
     const buffer = await readBodyWithLimit(response, MAX_IMAGE_BYTES);
 
+    // Security: Restrict CORS to prevent unauthorized cross-origin access.
+    // We only allow our own application to access this proxy.
+    const origin = request.headers.get('origin');
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    let allowedOrigin = '';
+
+    if (siteUrl && origin === new URL(siteUrl).origin) {
+      allowedOrigin = origin;
+    } else if (!origin) {
+      // Allow requests without Origin header (e.g., direct browser access)
+      allowedOrigin = '';
+    }
+
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400',
+        'Vary': 'Origin',
         'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy': "default-src 'none'; sandbox"
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+        ...(allowedOrigin && { 'Access-Control-Allow-Origin': allowedOrigin })
       }
     });
   } catch (error) {
+    if (error instanceof Error && error.message.includes('SSRF Blocked')) {
+      return NextResponse.json({ error: 'The provided URL is not allowed for security reasons.' }, { status: 403 });
+    }
+    if (error instanceof Error && error.message === 'Response too large') {
+      return NextResponse.json({ error: 'Image is too large' }, { status: 413 });
+    }
     console.error('Proxy error:', error);
-    return NextResponse.json({ error: 'Failed to proxy image' }, { status: 400 });
+    return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
   }
 }

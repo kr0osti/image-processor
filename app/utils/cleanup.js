@@ -13,7 +13,6 @@ export async function cleanupOldUploads(maxAgeMs = 60 * 60 * 1000) { // Default:
   
   // Check if uploads directory exists
   if (!existsSync(uploadsDir)) {
-    console.log('Uploads directory does not exist, nothing to clean up');
     return { deleted: 0, errors: 0 };
   }
   
@@ -26,28 +25,39 @@ export async function cleanupOldUploads(maxAgeMs = 60 * 60 * 1000) { // Default:
     // Skip .gitkeep file if it exists
     const filesToProcess = files.filter(file => file !== '.gitkeep');
     
-    console.log(`Checking ${filesToProcess.length} files for cleanup...`);
-    
-    for (const file of filesToProcess) {
-      const filePath = path.join(uploadsDir, file);
+    // Process files concurrently in batches to avoid EMFILE and memory issues
+    const BATCH_SIZE = 50; // Moderate batch size for fs operations
+
+    for (let i = 0; i < filesToProcess.length; i += BATCH_SIZE) {
+      const batch = filesToProcess.slice(i, i + BATCH_SIZE);
       
-      try {
+      const results = await Promise.allSettled(batch.map(async (file) => {
+        const filePath = path.join(uploadsDir, file);
         const fileStat = await stat(filePath);
         const fileAge = now - fileStat.mtimeMs;
         
         // If file is older than maxAgeMs, delete it
         if (fileAge > maxAgeMs) {
           await unlink(filePath);
-          deleted++;
-          console.log(`Deleted old file: ${file} (age: ${Math.round(fileAge / 1000 / 60)} minutes)`);
+          return true; // Indicates file was deleted
         }
-      } catch (err) {
-        console.error(`Error processing file ${file}:`, err);
-        errors++;
+        return false; // Indicates file was kept
+      }));
+
+      // Process results
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        if (result.status === 'fulfilled') {
+          if (result.value === true) {
+            deleted++;
+          }
+        } else {
+          console.error(`Error processing file ${batch[j]}:`, result.reason);
+          errors++;
+        }
       }
     }
     
-    console.log(`Cleanup complete. Deleted ${deleted} files, encountered ${errors} errors.`);
     return { deleted, errors };
   } catch (error) {
     console.error('Error cleaning up old uploads:', error);

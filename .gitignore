@@ -49,3 +49,4 @@ run-final-tests.sh
 run-images-test.sh
 # Keep the main test script
 # docker-test.sh
+coverage/

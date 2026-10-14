@@ -3,7 +3,7 @@
  */
 
 // Import the module
-import { createRateLimiter } from '../../app/utils/rate-limit';
+import { createRateLimiter, clearStoreForTesting } from '../../app/utils/rate-limit';
 
 // Create mock functions
 const mockJson = jest.fn((data, options = {}) => ({
@@ -22,6 +22,7 @@ jest.mock('next/server', () => ({
 describe('Rate Limiter Utility', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearStoreForTesting();
 
     // Reset the mockJson function
     mockJson.mockClear();
@@ -74,7 +75,7 @@ describe('Rate Limiter Utility', () => {
 
     // Mock request with IP
     const request = {
-      ip: '127.0.0.1',
+      ip: '127.0.0.2',
       headers: {
         get: jest.fn((header) => {
           if (header === 'x-forwarded-for') return null;
@@ -113,10 +114,8 @@ describe('Rate Limiter Utility', () => {
 
     // Mock request with IP
     const request = {
-      ip: '127.0.0.1',
-      headers: {
-        get: jest.fn(() => null),
-      },
+      ip: '127.0.0.3',
+      headers: { get: jest.fn((name) => name === 'x-forwarded-for' ? '127.0.0.1' : null) },
     };
 
     // Mock Date.now to simulate time passing
@@ -149,18 +148,11 @@ describe('Rate Limiter Utility', () => {
 
     // Mock requests with different IPs
     const request1 = {
-      ip: '127.0.0.1',
-      headers: {
-        get: jest.fn(() => null),
-      },
+      ip: '127.0.0.4',
+      headers: { get: jest.fn((name) => name === 'x-forwarded-for' ? '127.0.0.1' : null) },
     };
 
-    const request2 = {
-      ip: '192.168.1.1',
-      headers: {
-        get: jest.fn(() => null),
-      },
-    };
+    const request2 = { ip: '192.168.1.1', headers: { get: jest.fn((name) => name === 'x-forwarded-for' ? '192.168.1.1' : null) } };
 
     // Mock Date.now
     jest.spyOn(Date, 'now').mockImplementation(() => 1000);

@@ -1,7 +1,7 @@
 "use server"
 
 import * as cheerio from "cheerio"
-import { safeFetch, readBodyWithLimit } from "./utils/safe-fetch.js"
+import { isSafeUrl, safeFetch, readBodyWithLimit } from "@/lib/ssrf"
 
 // Maximum size of a scraped HTML page (10 MB)
 const MAX_HTML_BYTES = 10 * 1024 * 1024
@@ -40,7 +40,8 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
       baseUrl = url
     }
 
-    // Fetch the HTML content from the URL (only public http(s) addresses are allowed)
+    // Fetch the HTML content from the URL
+    // Security: Use safeFetch to prevent SSRF and validate redirect chain
     const response = await safeFetch(url, {
       headers: {
         "User-Agent":
@@ -157,6 +158,10 @@ export async function fetchImagesFromUrl(url: string, customBaseUrl?: string) {
     logs.push(`Found ${imageUrls.length} unique images`)
     return { imageUrls, imageMetadata, logs }
   } catch (error) {
+    if (error instanceof Error && error.message.includes('SSRF Blocked')) {
+      logs.push(`Security error: ${error.message}`)
+      return { error: "The provided URL is not allowed for security reasons.", logs }
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     logs.push(`Error in fetchImagesFromUrl: ${errorMessage}`)
     console.error("Error in fetchImagesFromUrl:", error)

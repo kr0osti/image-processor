@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import React from 'react';
 
 // This is fine at module level - it's not a hook
@@ -61,6 +61,18 @@ export default function ImageProcessor() {
   const [fetchedImages, setFetchedImages] = useState<string[]>([])
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [imageMetadata, setImageMetadata] = useState<ImageMetadata[]>([])
+
+  const sizeCounts = useMemo(() => {
+    const counts = { small: 0, medium: 0, large: 0, unknown: 0 };
+    for (const m of imageMetadata) {
+      if (m.size === 'small') counts.small++;
+      else if (m.size === 'medium') counts.medium++;
+      else if (m.size === 'large') counts.large++;
+      else counts.unknown++;
+    }
+    return counts;
+  }, [imageMetadata]);
+
   const [sizeFilter, setSizeFilter] = useState<('small' | 'medium' | 'large' | 'unknown')[]>(['large'])
   const [filteredImages, setFilteredImages] = useState<string[]>([])
   const [minWidth, setMinWidth] = useState<number | undefined>(undefined)
@@ -151,10 +163,9 @@ export default function ImageProcessor() {
   }, [imageUrls])
 
   const addLog = (message: string) => {
-    // Check if DEBUG is enabled - add more explicit logging to debug the issue
-    console.log(`Debug setting: ${process.env.NEXT_PUBLIC_DEBUG}`)
-
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      // Check if DEBUG is enabled - add more explicit logging to debug the issue
+      console.log(`Debug setting: ${process.env.NEXT_PUBLIC_DEBUG}`)
       console.log(`[${new Date().toLocaleTimeString()}] ${message}`)
     }
   }
@@ -1190,11 +1201,12 @@ export default function ImageProcessor() {
           }
 
           if (loaded === urls.length) {
-            const counts = {
-              small: updated.filter(m => m.size === 'small').length,
-              medium: updated.filter(m => m.size === 'medium').length,
-              large: updated.filter(m => m.size === 'large').length,
-              unknown: updated.filter(m => m.size === 'unknown').length
+            const counts = { small: 0, medium: 0, large: 0, unknown: 0 };
+            for (const m of updated) {
+              if (m.size === 'small') counts.small++;
+              else if (m.size === 'medium') counts.medium++;
+              else if (m.size === 'large') counts.large++;
+              else counts.unknown++;
             }
 
             addLog(`Image sizes: ${counts.small} small, ${counts.medium} medium, ${counts.large} large, ${counts.unknown} unknown`)
@@ -1334,7 +1346,7 @@ export default function ImageProcessor() {
                                 onCheckedChange={() => toggleSizeFilter('small')}
                               />
                               <label htmlFor="size-small" className="text-sm">
-                                Small ({imageMetadata.filter(m => m.size === 'small').length})
+                                Small ({sizeCounts.small})
                               </label>
                             </div>
 
@@ -1345,7 +1357,7 @@ export default function ImageProcessor() {
                                 onCheckedChange={() => toggleSizeFilter('medium')}
                               />
                               <label htmlFor="size-medium" className="text-sm">
-                                Medium ({imageMetadata.filter(m => m.size === 'medium').length})
+                                Medium ({sizeCounts.medium})
                               </label>
                             </div>
 
@@ -1356,7 +1368,7 @@ export default function ImageProcessor() {
                                 onCheckedChange={() => toggleSizeFilter('large')}
                               />
                               <label htmlFor="size-large" className="text-sm">
-                                Large ({imageMetadata.filter(m => m.size === 'large').length})
+                                Large ({sizeCounts.large})
                               </label>
                             </div>
                           </div>

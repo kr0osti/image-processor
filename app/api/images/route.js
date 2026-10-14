@@ -9,9 +9,7 @@ import { createRateLimiter } from '../../utils/rate-limit.js';
 // Run cleanup on server start (will run when this file is first imported)
 (async () => {
   try {
-    console.log('Running initial cleanup of old uploads...');
     const result = await cleanupOldUploads();
-    console.log(`Initial cleanup complete. Deleted ${result.deleted} files.`);
   } catch (error) {
     console.error('Error during initial cleanup:', error);
   }
@@ -28,18 +26,15 @@ async function ensureUploadsDir() {
   try {
     if (!existsSync(uploadsDir)) {
       await mkdir(uploadsDir, { recursive: true });
-      console.log(`Created uploads directory at: ${uploadsDir}`);
     }
 
     // Log the directory for debugging
-    console.log(`Using uploads directory: ${uploadsDir}`);
 
     // Check if directory is writable
     try {
       const testFile = path.join(uploadsDir, '.test-write');
       await writeFile(testFile, 'test');
       await unlink(testFile);
-      console.log('Uploads directory is writable');
     } catch (writeError) {
       console.error('Uploads directory is not writable:', writeError);
     }
@@ -143,7 +138,6 @@ export async function POST(request) {
        * This helps identify potential issues with large payloads
        * Size is converted from bytes to kilobytes for readability
        */
-      console.log(`Received data URL of size: ${Math.round(dataUrl.length / 1024)} KB`);
 
       // Extract the base64 data from the data URL
       const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
@@ -183,18 +177,15 @@ export async function POST(request) {
       }
       
       const filePath = path.join(uploadsDir, filename);
-      console.log(`Attempting to save file to: ${filePath}`);
 
       try {
         // Convert base64 to buffer and save to file
         const buffer = Buffer.from(matches[2], 'base64');
         await writeFile(filePath, buffer);
 
-        console.log(`Successfully saved image to: ${filePath}`);
 
         // Verify file exists after saving
         if (existsSync(filePath)) {
-          console.log(`Verified file exists at: ${filePath}`);
         } else {
           console.error(`File was not found after saving: ${filePath}`);
         }
@@ -204,11 +195,6 @@ export async function POST(request) {
         const apiUrl = `/api/serve-image?file=${filename}`;
 
         // After saving the file
-        console.log(`Current working directory: ${process.cwd()}`);
-        console.log(`Public directory: ${path.join(process.cwd(), 'public')}`);
-        console.log(`Uploads directory: ${uploadsDir}`);
-        console.log(`File saved to: ${filePath}`);
-        console.log(`Public URL should be: ${publicUrl}`);
 
         // Clear the timeout since we're about to return successfully
         if (timeoutId) clearTimeout(timeoutId);
@@ -244,7 +230,6 @@ export async function POST(request) {
       const processedImages = [];
 
       if (imageUrls && imageUrls.length > 0) {
-        console.log(`Processing ${imageUrls.length} image URLs`);
         // Process image URLs
         for (const url of imageUrls) {
           if (url) {
@@ -259,42 +244,45 @@ export async function POST(request) {
 
       if (files && files.length > 0) {
         console.log(`Processing ${files.length} uploaded files`);
-        // Process uploaded files
-        for (const file of files) {
-          if (file && typeof file === 'object') {
-            // Only accept allowed image types within the size limit
-            const fileExt = ALLOWED_IMAGE_TYPES[(file.type || '').toLowerCase()];
-            if (!fileExt || file.size > MAX_IMAGE_BYTES) {
-              processedImages.push({
-                originalName: file.name,
-                processedUrl: null,
-                success: false,
-                message: !fileExt ? 'Unsupported file type' : 'File too large'
-              });
-              continue;
-            }
+        // Ensure the uploads directory exists once before processing all files
+        const uploadsDir = await ensureUploadsDir();
 
-            // Save the file to the uploads directory
-            const uploadsDir = await ensureUploadsDir();
-            const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
-            const filePath = path.join(uploadsDir, filename);
-            const publicUrl = `/uploads/${filename}`;
+        // Process uploaded files concurrently
+        const filePromises = files.map(async (file) => {
+          if (!file || typeof file !== 'object') return null;
 
-            // Get file data as ArrayBuffer and save it
-            const fileData = await file.arrayBuffer();
-            await writeFile(filePath, Buffer.from(fileData));
-
-            processedImages.push({
+          // Only accept allowed image types within the size limit
+          const fileExt = ALLOWED_IMAGE_TYPES[(file.type || '').toLowerCase()];
+          if (!fileExt || file.size > MAX_IMAGE_BYTES) {
+            return {
               originalName: file.name,
-              processedUrl: publicUrl,
-              success: true
-            });
+              processedUrl: null,
+              success: false,
+              message: !fileExt ? 'Unsupported file type' : 'File too large'
+            };
           }
-        }
+
+          // Save the file to the uploads directory
+          const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
+          const filePath = path.join(uploadsDir, filename);
+          const publicUrl = `/uploads/${filename}`;
+
+          // Get file data as ArrayBuffer and save it
+          const fileData = await file.arrayBuffer();
+          await writeFile(filePath, Buffer.from(fileData));
+
+          return {
+            originalName: file.name,
+            processedUrl: publicUrl,
+            success: true
+          };
+        });
+
+        const results = await Promise.all(filePromises);
+        processedImages.push(...results.filter(Boolean));
       }
 
       if (webUrl) {
-        console.log(`Processing images from web URL: ${webUrl}`);
         processedImages.push({
           originalUrl: webUrl,
           processedUrl: null,
