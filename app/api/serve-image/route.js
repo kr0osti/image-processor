@@ -52,8 +52,10 @@ export async function GET(request) {
     };
     if (download) {
       // Plain ASCII fallback for old clients, the real name as RFC 5987 UTF-8
+      // (which also forbids the ' ( ) * that encodeURIComponent leaves as is)
       const asciiName = filename.replace(/[^\x20-\x7e]|["\\]/g, '_');
-      headers['Content-Disposition'] = `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+      const utf8Name = encodeURIComponent(filename).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+      headers['Content-Disposition'] = `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`;
     }
 
     // Return the file
