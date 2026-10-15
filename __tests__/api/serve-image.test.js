@@ -7,11 +7,13 @@ beforeAll(() => {
   }
   fs.writeFileSync(path.join(uploadsDir, 'test.png'), 'test');
   fs.writeFileSync(path.join(uploadsDir, 'test.jpg'), 'test');
+  fs.writeFileSync(path.join(uploadsDir, "l'été (1).png"), 'test');
 });
 // Remove the fixtures so test runs leave public/uploads as they found it
 afterAll(() => {
   fs.rmSync(path.join(uploadsDir, 'test.png'), { force: true });
   fs.rmSync(path.join(uploadsDir, 'test.jpg'), { force: true });
+  fs.rmSync(path.join(uploadsDir, "l'été (1).png"), { force: true });
 });
 if (typeof Request === "undefined") { global.Request = class Request {}; }
 /**
@@ -82,5 +84,30 @@ describe('Serve Image API', () => {
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=86400');
   });
 
+  it('shows the image inline by default', async () => {
+    const response = await GET({ url: 'http://localhost:3000/api/serve-image?file=test.png' });
+    expect(response.headers.has('Content-Disposition')).toBe(false);
+  });
+
+  it('asks the browser to download it with download=1', async () => {
+    for (const value of ['1', 'true', 'yes']) {
+      const response = await GET({ url: `http://localhost:3000/api/serve-image?file=test.png&download=${value}` });
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Disposition')).toBe(
+        `attachment; filename="test.png"; filename*=UTF-8''test.png`,
+      );
+    }
+    const off = await GET({ url: 'http://localhost:3000/api/serve-image?file=test.png&download=0' });
+    expect(off.headers.has('Content-Disposition')).toBe(false);
+  });
+
+  it('encodes names with quotes and accents for download', async () => {
+    const response = await GET({
+      url: `http://localhost:3000/api/serve-image?file=${encodeURIComponent("l'été (1).png")}&download=1`,
+    });
+    expect(response.headers.get('Content-Disposition')).toBe(
+      `attachment; filename="l'_t_ (1).png"; filename*=UTF-8''l%27%C3%A9t%C3%A9%20%281%29.png`,
+    );
+  });
 
 });

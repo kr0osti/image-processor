@@ -130,7 +130,7 @@ A single Next.js application:
 | `/api/images` | POST | Save an image already processed by the web UI (JSON data URL); returns its `filename` and a `deleteToken` | 300 req/min |
 | `/api/images` | DELETE | Delete saved images: `{ files: [{ filename, token }] }`, each with the token returned when it was saved | 30 req/min |
 | `/api/proxy` | GET | Proxy for fetching images to avoid CORS issues | 500 req/min |
-| `/api/serve-image` | GET | Serve processed images from the server | — |
+| `/api/serve-image` | GET | Serve processed images: `?file=<name>`; add `&download=1` to make browsers save the file instead of showing it | — |
 | `/api/cleanup` | GET | Delete uploads older than `maxAge` minutes (default 60); requires `?key=<CLEANUP_API_KEY>` | 5 req/min |
 | `/api/healthcheck` | GET | Check if the application is running | 30 req/min |
 
