@@ -27,6 +27,12 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
+    // Chunked uploads send hundreds of small requests per image; their route
+    // has its own, higher limit
+    if (/^\/api\/process\/uploads\/[^/]+\/chunks\/[^/]+$/.test(pathname)) {
+      return NextResponse.next();
+    }
+
     // Apply global API rate limiting
     const rateLimitResponse = await globalApiRateLimiter(request);
     if (rateLimitResponse) {
