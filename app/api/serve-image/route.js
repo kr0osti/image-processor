@@ -43,13 +43,21 @@ export async function GET(request) {
     else if (ext === '.gif') contentType = 'image/gif';
     else if (ext === '.webp') contentType = 'image/webp';
     
+    // ?download=1 asks the browser to save the file instead of showing it,
+    // e.g. for a link opened from a script that can't save files itself
+    const download = ['1', 'true', 'yes'].includes((url.searchParams.get('download') || '').toLowerCase());
+    const headers = {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=86400'
+    };
+    if (download) {
+      // Plain ASCII fallback for old clients, the real name as RFC 5987 UTF-8
+      const asciiName = filename.replace(/[^\x20-\x7e]|["\\]/g, '_');
+      headers['Content-Disposition'] = `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+    }
+
     // Return the file
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400'
-      }
-    });
+    return new NextResponse(fileBuffer, { headers });
   } catch (error) {
     console.error('Error serving image:', error);
     return NextResponse.json({ error: 'Failed to serve image' }, { status: 500 });

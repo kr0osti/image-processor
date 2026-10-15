@@ -82,5 +82,21 @@ describe('Serve Image API', () => {
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=86400');
   });
 
+  it('shows the image inline by default', async () => {
+    const response = await GET({ url: 'http://localhost:3000/api/serve-image?file=test.png' });
+    expect(response.headers.has('Content-Disposition')).toBe(false);
+  });
+
+  it('asks the browser to download it with download=1', async () => {
+    for (const value of ['1', 'true']) {
+      const response = await GET({ url: `http://localhost:3000/api/serve-image?file=test.png&download=${value}` });
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Disposition')).toBe(
+        `attachment; filename="test.png"; filename*=UTF-8''test.png`,
+      );
+    }
+    const off = await GET({ url: 'http://localhost:3000/api/serve-image?file=test.png&download=0' });
+    expect(off.headers.has('Content-Disposition')).toBe(false);
+  });
 
 });
