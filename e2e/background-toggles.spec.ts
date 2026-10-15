@@ -57,6 +57,15 @@ test.describe('Processed image toggles', () => {
 
     await expect(page.getByRole('heading', { name: 'Processed Images (2)' })).toBeVisible({ timeout: 60_000 });
 
+    // Saved as real PNG files, not re-encoded to JPEG
+    for (const alt of ['Processed image 1', 'Processed image 2']) {
+      const src = (await page.getByAltText(alt).getAttribute('src'))!;
+      expect(src).toMatch(/-processed\.png/);
+      const response = await page.request.get(src);
+      expect(response.headers()['content-type']).toBe('image/png');
+      expect((await response.body()).subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    }
+
     const productWhiteBg = page.locator('#white-bg-0');
     const productTrim = page.locator('#trim-padding-0');
     const photoWhiteBg = page.locator('#white-bg-1');

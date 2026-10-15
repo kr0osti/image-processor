@@ -11,6 +11,7 @@ A powerful web application that allows you to download, process, and standardize
 - **Low-Resolution Warning**: Images that had to be upscaled are flagged with their source size and upscale factor
 - **Languages**: English, French, Spanish and German, picked from the browser language or the header switcher
 - **Light & Dark Themes**: Follows the system setting, with a toggle in the header
+- **Lossless PNG Output**: Processed images are saved and downloaded as PNG; the API rejects other formats
 - **Download Options**: Download individual images or as a ZIP archive
 - **Deleting**: The ✕ on a processed image and "Delete All Files" also delete the saved files from the server; files saved before a restart (without `UPLOAD_TOKEN_SECRET`) are left to the cleanup job
 - **CORS Handling**: Creates placeholders for images that can't be loaded due to CORS restrictions

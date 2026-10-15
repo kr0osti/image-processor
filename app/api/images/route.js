@@ -48,12 +48,9 @@ async function ensureUploadsDir() {
 }
 
 // Allowed image MIME types and the file extension used when saving them
+// Processed images are always stored as lossless PNG
 const ALLOWED_IMAGE_TYPES = {
   'image/png': 'png',
-  'image/jpeg': 'jpeg',
-  'image/jpg': 'jpg',
-  'image/gif': 'gif',
-  'image/webp': 'webp',
 };
 
 // Maximum size of a single saved image (25 MB)

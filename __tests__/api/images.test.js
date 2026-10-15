@@ -76,6 +76,18 @@ describe('Images API', () => {
     expect(data.apiUrl).toMatch(/^\/api\/serve-image\?file=[a-f0-9]+\.png$/);
   });
 
+  it('should reject image types other than PNG', async () => {
+    // Processed images are always stored as PNG
+    for (const type of ['image/jpeg', 'image/webp', 'image/gif']) {
+      const response = await POST(createMockRequest({ dataUrl: `data:${type};base64,AAAA` }));
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.message).toBe('Invalid data URL format');
+    }
+    expect(require('fs/promises').writeFile).not.toHaveBeenCalledWith(expect.stringMatching(/\.(jpe?g|webp|gif)$/), expect.anything());
+  });
+
   it('should handle file write errors', async () => {
     // The writability probe in ensureUploadsDir succeeds; saving the image itself fails
     let callCount = 0;
