@@ -87,4 +87,7 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["node", "server.js"]
+# Larger request headers for chunked uploads (/api/process/uploads), whose
+# data travels in a header. A command-line flag, so a NODE_OPTIONS set in
+# .env can't drop it
+CMD ["node", "--max-http-header-size=65536", "server.js"]

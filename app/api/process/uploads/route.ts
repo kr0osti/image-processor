@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createRateLimiter } from '../../../utils/rate-limit.js'
 import { checkProcessAuth, errorResponse as error } from '@/lib/process-api'
-import { MAX_UPLOAD_BYTES, SESSION_IDLE_MS, UploadError, chunkChars, uploads } from '@/lib/chunked-upload'
+import { MAX_UPLOAD_BYTES, SESSION_IDLE_MS, UploadError, chunkChars, decodeUploadName, uploads } from '@/lib/chunked-upload'
 
 export const runtime = 'nodejs'
 
@@ -16,9 +16,9 @@ const rateLimiter = createRateLimiter({
  * Starts a chunked upload, for clients that can't send a request body.
  *
  * Headers: `Authorization: Bearer <PROCESS_API_KEY>`, `X-Upload-Size` (image
- * size in bytes) and optionally `X-Upload-Name` (file name, used to name a
- * stored result). Returns the upload `id` and `chunkChars`, the most base64
- * characters one chunk may carry.
+ * size in bytes) and optionally `X-Upload-Name` (file name, percent-encoded
+ * if it isn't ASCII; used to name the result). Returns the upload `id` and
+ * `chunkChars`, the most base64 characters one chunk may carry.
  *
  * Then: POST /api/process/uploads/{id}/chunks/{index} once per chunk, and
  * POST /api/process/uploads/{id}/process to get the processed image.
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const size = Number(request.headers.get('x-upload-size'))
-    const name = request.headers.get('x-upload-name')?.slice(0, 255) || undefined
+    const name = decodeUploadName(request.headers.get('x-upload-name'))
     const id = uploads.start(size, name)
     return NextResponse.json(
       {

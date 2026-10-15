@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { MAX_UPLOAD_BYTES, SESSION_IDLE_MS, UploadStore, chunkChars } from '@/lib/chunked-upload'
+import { MAX_UPLOAD_BYTES, SESSION_IDLE_MS, UploadStore, chunkChars, decodeUploadName } from '@/lib/chunked-upload'
 
 const split = (data: Buffer, size: number) => {
   const text = data.toString('base64')
@@ -30,6 +30,26 @@ describe('UploadStore', () => {
     expect(store.addChunk(id, 0, chunks[0]).received).toBe(300)
     chunks.slice(1).forEach((chunk, i) => store.addChunk(id, i + 1, chunk))
     expect(store.take(id).buffer.equals(image)).toBe(true)
+  })
+
+  it('does not mistake a different chunk of the same length for a retry', () => {
+    const store = new UploadStore()
+    const id = store.start(image.length)
+    const chunks = split(image, 400)
+    store.addChunk(id, 0, chunks[0])
+    expect(() => store.addChunk(id, 0, 'A'.repeat(chunks[0].length))).toThrow(expect.objectContaining({ status: 409 }))
+  })
+
+  it('rejects padding before the last chunk', () => {
+    const store = new UploadStore()
+    const id = store.start(4)
+    // Each byte encoded on its own: the first chunk ends the base64 text early
+    expect(() => store.addChunk(id, 0, Buffer.alloc(1).toString('base64'))).toThrow(
+      expect.objectContaining({ status: 400 }),
+    )
+    store.addChunk(id, 0, Buffer.alloc(3).toString('base64'))
+    store.addChunk(id, 1, Buffer.alloc(1).toString('base64'))
+    expect(store.take(id).buffer.length).toBe(4)
   })
 
   it('rejects chunks out of order', () => {
@@ -108,5 +128,25 @@ describe('chunkChars', () => {
   it('can be lowered for a reverse proxy', () => {
     process.env.UPLOAD_CHUNK_CHARS = '6001'
     expect(chunkChars()).toBe(6000)
+  })
+})
+
+describe('decodeUploadName', () => {
+  it('keeps plain names and drops empty ones', () => {
+    expect(decodeUploadName('shoe.png')).toBe('shoe.png')
+    expect(decodeUploadName('')).toBeUndefined()
+    expect(decodeUploadName(null)).toBeUndefined()
+  })
+
+  it('decodes percent-encoded names', () => {
+    expect(decodeUploadName(encodeURIComponent('chaussure bleue é.png'))).toBe('chaussure bleue é.png')
+  })
+
+  it('recovers UTF-8 sent raw, which arrives as Latin-1', () => {
+    expect(decodeUploadName(Buffer.from('é.png', 'utf8').toString('latin1'))).toBe('é.png')
+  })
+
+  it('keeps names that are not valid percent-encoding', () => {
+    expect(decodeUploadName('100%.png')).toBe('100%.png')
   })
 })

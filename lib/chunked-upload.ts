@@ -40,8 +40,8 @@ interface Session {
   name?: string
   chunks: Buffer[]
   received: number
-  // Length of the last chunk, so a retried chunk can be recognised
-  lastChunkChars: number
+  // The last chunk as sent, so a retried chunk can be recognised
+  lastChunk: string
   touchedAt: number
 }
 
@@ -100,13 +100,14 @@ export class UploadStore {
       throw new UploadError('Too many uploads in progress. Please try again later.', 503)
     }
     const id = randomBytes(16).toString('hex')
-    this.sessions.set(id, { size, name, chunks: [], received: 0, lastChunkChars: 0, touchedAt: this.now() })
+    this.sessions.set(id, { size, name, chunks: [], received: 0, lastChunk: '', touchedAt: this.now() })
     return id
   }
 
   /**
-   * Adds chunk `index` (0-based, in order). Resending the last chunk is
-   * accepted and ignored, so a client can retry after a lost response.
+   * Adds chunk `index` (0-based, in order). Resending the last chunk
+   * unchanged is accepted and ignored, so a client can retry after a lost
+   * response.
    * Every chunk but the last must be a whole number of base64 quads.
    */
   addChunk(id: string, index: number, data: string): { received: number; size: number } {
@@ -114,7 +115,7 @@ export class UploadStore {
     const next = session.chunks.length
 
     if (!Number.isInteger(index) || index < 0) throw new UploadError('The chunk index must be a whole number.')
-    if (index === next - 1 && data.length === session.lastChunkChars) {
+    if (index === next - 1 && data === session.lastChunk) {
       session.touchedAt = this.now()
       return { received: session.received, size: session.size }
     }
@@ -129,9 +130,13 @@ export class UploadStore {
     if (session.received + bytes.length > session.size) {
       throw new UploadError('The chunks are larger than the announced image size.', 413)
     }
+    // Padding means the base64 text ends here, so only the final chunk may have it
+    if (data.endsWith('=') && session.received + bytes.length < session.size) {
+      throw new UploadError('Only the last chunk may end with "=" padding: split the base64 text, not the image bytes.')
+    }
     session.chunks.push(bytes)
     session.received += bytes.length
-    session.lastChunkChars = data.length
+    session.lastChunk = data
     session.touchedAt = this.now()
     return { received: session.received, size: session.size }
   }
@@ -150,6 +155,27 @@ export class UploadStore {
   cancel(id: string): void {
     this.sessions.delete(id)
   }
+}
+
+/**
+ * File name from the `X-Upload-Name` header. Header values are Latin-1, so
+ * clients percent-encode other characters (encodeURIComponent); UTF-8 sent
+ * raw is recovered too.
+ */
+export function decodeUploadName(header: string | null): string | undefined {
+  if (!header) return undefined
+  let name = header
+  try {
+    name = decodeURIComponent(header)
+  } catch {
+    // Not percent-encoded: keep it as is
+  }
+  // Raw UTF-8 bytes arrive as one Latin-1 character each
+  if (/[\x80-\xff]/.test(name) && /^[\x00-\xff]*$/.test(name)) {
+    const utf8 = Buffer.from(name, 'latin1').toString('utf8')
+    if (!utf8.includes('\uFFFD')) name = utf8
+  }
+  return name.slice(0, 255) || undefined
 }
 
 // One store per server process, kept across hot reloads in development

@@ -171,13 +171,13 @@ PNG responses carry the details in headers (`X-White-Background`, `X-Trimmed`, `
 
 Some clients can only set a URL and headers, not a request body: the Affinity scripting SDK is one. They upload the image as base64 pieces in a header, then ask for it to be processed. All steps need `Authorization: Bearer <PROCESS_API_KEY>`.
 
-1. `POST /api/process/uploads` with `X-Upload-Size: <bytes>` and optionally `X-Upload-Name: <file name>`. The answer gives the upload `id` and `chunkChars`, the most base64 characters one chunk may carry.
-2. `POST /api/process/uploads/{id}/chunks/{n}` for `n` = 0, 1, 2… with the next piece of the base64 text in `X-Chunk-Data`. Every piece but the last must have a length that is a multiple of 4. Resending the last chunk after a lost response is harmless.
+1. `POST /api/process/uploads` with `X-Upload-Size: <bytes>` and optionally `X-Upload-Name: <file name>` (percent-encoded if it isn't plain ASCII). The answer gives the upload `id` and `chunkChars`, the most base64 characters one chunk may carry.
+2. `POST /api/process/uploads/{id}/chunks/{n}` for `n` = 0, 1, 2… with the next piece of the base64 text in `X-Chunk-Data`. Split the base64 text of the whole file, not the file itself: every piece but the last has a length that is a multiple of 4 and no `=` padding. Resending the last chunk unchanged after a lost response is harmless.
 3. `POST /api/process/uploads/{id}/process?padding=100&…` with the same parameters as `/api/process`, plus `store=true` to also save the result. The answer is JSON with the PNG as base64 in `png`, its `filename`, the details (`whiteBackground`, `upscale`, …) and, when stored, `url` and `deleteToken`.
 
 Uploads are kept in memory: 25 MB per image, 200 MB and 32 uploads in total, dropped after 10 idle minutes or with `POST /api/process/uploads/{id}/cancel`.
 
-The chunk size follows Node's header limit: 12 KB by default. The Docker Compose files raise the limit to 64 KB (`--max-http-header-size=65536` in `NODE_OPTIONS`), so a 4 MB image takes about 90 requests instead of 360. A reverse proxy in front must accept headers that large too, e.g. `large_client_header_buffers 4 64k;` for nginx; otherwise lower `UPLOAD_CHUNK_CHARS` to match it.
+The chunk size follows Node's header limit. The Docker image raises that limit to 64 KB (`node --max-http-header-size=65536`, which a `NODE_OPTIONS` in `.env` doesn't override), so chunks carry 60 KB and a 4 MB image takes about 90 requests. Outside Docker the default 16 KB limit gives 12 KB chunks (about 360 requests); add `--max-http-header-size=65536` to `NODE_OPTIONS` to raise it, as `.env.example` does. A reverse proxy in front must accept headers that large too, e.g. `large_client_header_buffers 4 64k;` for nginx; otherwise lower `UPLOAD_CHUNK_CHARS` to match it.
 
 ## 🧪 Testing
 
