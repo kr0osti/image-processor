@@ -173,4 +173,32 @@ test.describe('Processed image toggles', () => {
     await expect(page.getByRole('heading', { name: /Processed Images/ })).toHaveCount(0);
     await expect.poll(async () => (await page.request.get(src!)).status()).toBe(404);
   });
+
+  test('reprocessing one image only locks that image\'s remove button', async ({ page }) => {
+    await page.goto('/');
+    const product = await makePng(page, 800, 800, { x: 340, y: 340, width: 120, height: 120, color: 'black' });
+    const id = Date.now();
+    await page.locator('input[type="file"]').setInputFiles([
+      { name: `one-${id}.png`, mimeType: 'image/png', buffer: product },
+      { name: `two-${id}.png`, mimeType: 'image/png', buffer: product },
+    ]);
+    await expect(page.getByRole('heading', { name: 'Processed Images (2)' })).toBeVisible({ timeout: 60_000 });
+
+    // Hold the save request so the reprocess stays in progress while we look
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route('**/api/images', async (route) => {
+      if (route.request().method() === 'POST') await held;
+      await route.continue();
+    });
+
+    await page.locator('#white-bg-0').click();
+    await expect(page.getByRole('button', { name: 'Remove image 1' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Remove image 2' })).toBeEnabled();
+
+    release();
+    await expect(page.getByRole('button', { name: 'Remove image 1' })).toBeEnabled({ timeout: 30_000 });
+    await page.unroute('**/api/images');
+  });
 });
+

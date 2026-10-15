@@ -6,6 +6,16 @@ import { OUTPUT_SIZE } from './image-layout'
 
 export type ImportKind = 'native' | 'svg' | 'pdf' | 'heic' | 'tiff'
 
+// Vectors are rasterized with their longest side at the output size, the
+// largest they are ever drawn (vector sources skip the low-resolution warning)
+export const VECTOR_RENDER_SIZE = OUTPUT_SIZE
+
+export interface LoadedImport {
+  blob: Blob
+  // Rendered from a vector (SVG, PDF, AI): it has no fixed resolution, so it is never "low resolution"
+  vector: boolean
+}
+
 // Value for the file input's accept attribute
 export const IMPORT_ACCEPT = [
   'image/*',
@@ -69,7 +79,7 @@ export const detectImportKind = (name: string, type: string, head: Uint8Array): 
  * Size to rasterize a vector at: its longest side becomes `target`, so vectors
  * are never upscaled from a small intrinsic size.
  */
-export const vectorRenderSize = (width: number, height: number, target: number = OUTPUT_SIZE) => {
+export const vectorRenderSize = (width: number, height: number, target: number = VECTOR_RENDER_SIZE) => {
   const w = width > 0 ? width : target
   const h = height > 0 ? height : target
   const scale = target / Math.max(w, h)
@@ -111,23 +121,88 @@ const svgText = async (file: Blob, head: Uint8Array): Promise<string> =>
     ? new Response(file.stream().pipeThrough(new DecompressionStream('gzip'))).text()
     : file.text()
 
-async function svgToPng(file: Blob, head: Uint8Array): Promise<Blob> {
-  const doc = new DOMParser().parseFromString(await svgText(file, head), 'image/svg+xml')
-  const svg = doc.documentElement
-  if (svg.nodeName.toLowerCase() !== 'svg' || doc.getElementsByTagName('parsererror').length > 0) {
-    throw new Error('Invalid SVG')
-  }
+// --- Vector margin cropping -------------------------------------------------
+// Vectors are rendered twice: once to find where the drawing is, then again with
+// the view cropped to it, so the drawing itself (not its empty margins) fills
+// VECTOR_RENDER_SIZE and is never enlarged later.
 
-  // Give the SVG explicit pixel dimensions at output size so it renders crisply;
-  // a viewBox keeps the drawing scaled to those dimensions instead of cropped
-  const intrinsic = svgIntrinsicSize(svg)
-  const { width, height } = vectorRenderSize(intrinsic.width, intrinsic.height)
-  if (!svg.getAttribute('viewBox') && intrinsic.width && intrinsic.height) {
-    svg.setAttribute('viewBox', `0 0 ${intrinsic.width} ${intrinsic.height}`)
+export interface PixelBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * Bounding box of the visible drawing in RGBA pixels: anything that is not
+ * transparent or pure white, padded by `margin` pixels and clamped to the image.
+ * Returns null when there is nothing visible.
+ */
+export const visibleBounds = (data: ArrayLike<number>, width: number, height: number, margin = 2): PixelBounds | null => {
+  let minX = width
+  let minY = height
+  let maxX = -1
+  let maxY = -1
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4
+      const visible = data[i + 3] >= 16 && !(data[i] >= 250 && data[i + 1] >= 250 && data[i + 2] >= 250)
+      if (visible) {
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+      }
+    }
   }
+  if (maxX < 0) return null
+  const x = Math.max(0, minX - margin)
+  const y = Math.max(0, minY - margin)
+  return { x, y, width: Math.min(width, maxX + 1 + margin) - x, height: Math.min(height, maxY + 1 + margin) - y }
+}
+
+/** Whether cropping to the bounds removes anything worth a second render */
+const worthCropping = (bounds: PixelBounds | null, width: number, height: number): bounds is PixelBounds =>
+  bounds !== null && (bounds.width < width - 1 || bounds.height < height - 1)
+
+/**
+ * The viewBox showing only `bounds` (pixels of an SVG rendered at width x height
+ * with the given viewBox and preserveAspectRatio).
+ */
+export const croppedViewBox = (
+  viewBox: [number, number, number, number],
+  width: number,
+  height: number,
+  bounds: PixelBounds,
+  preserveAspectRatio = 'xMidYMid meet',
+): [number, number, number, number] => {
+  const [vbX, vbY, vbW, vbH] = viewBox
+  let scaleX = width / vbW
+  let scaleY = height / vbH
+  let offsetX = 0
+  let offsetY = 0
+  if (!preserveAspectRatio.trim().startsWith('none')) {
+    // Uniform scale, centred (other alignments are rare and treated as centred)
+    const scale = preserveAspectRatio.includes('slice') ? Math.max(scaleX, scaleY) : Math.min(scaleX, scaleY)
+    scaleX = scale
+    scaleY = scale
+    offsetX = (width - vbW * scale) / 2
+    offsetY = (height - vbH * scale) / 2
+  }
+  return [
+    vbX + (bounds.x - offsetX) / scaleX,
+    vbY + (bounds.y - offsetY) / scaleY,
+    bounds.width / scaleX,
+    bounds.height / scaleY,
+  ]
+}
+
+const contentOf = (canvas: HTMLCanvasElement): PixelBounds | null =>
+  visibleBounds(canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height)
+
+async function renderSvg(svg: Element, width: number, height: number): Promise<HTMLCanvasElement> {
   svg.setAttribute('width', String(width))
   svg.setAttribute('height', String(height))
-
   // Loaded through <img>, so scripts and external resources in the SVG never run
   const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }))
   try {
@@ -135,11 +210,55 @@ async function svgToPng(file: Blob, head: Uint8Array): Promise<Blob> {
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
-    canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
-    return await canvasToPng(canvas)
+    canvas.getContext('2d', { willReadFrequently: true })!.drawImage(img, 0, 0, width, height)
+    return canvas
   } finally {
     URL.revokeObjectURL(url)
   }
+}
+
+/**
+ * SVG markup with scripts, event handlers, foreignObject and other non-SVG
+ * content removed. Rendering through <img> already keeps scripts from running;
+ * this keeps the markup safe wherever it is handled.
+ */
+export async function sanitizeSvg(markup: string): Promise<string> {
+  const { default: DOMPurify } = await import('dompurify')
+  return DOMPurify.sanitize(markup, { USE_PROFILES: { svg: true, svgFilters: true } })
+}
+
+async function svgToPng(file: Blob, head: Uint8Array): Promise<Blob> {
+  const doc = new DOMParser().parseFromString(await sanitizeSvg(await svgText(file, head)), 'image/svg+xml')
+  const svg = doc.documentElement
+  if (svg.nodeName.toLowerCase() !== 'svg' || doc.getElementsByTagName('parsererror').length > 0) {
+    throw new Error('Invalid SVG')
+  }
+
+  // A viewBox keeps the drawing scaled to the render size instead of cropped
+  const intrinsic = svgIntrinsicSize(svg)
+  if (!svg.getAttribute('viewBox') && intrinsic.width && intrinsic.height) {
+    svg.setAttribute('viewBox', `0 0 ${intrinsic.width} ${intrinsic.height}`)
+  }
+  const { width, height } = vectorRenderSize(intrinsic.width, intrinsic.height)
+  const first = await renderSvg(svg, width, height)
+
+  // Second pass: crop the viewBox to the drawing and render it at full size
+  const viewBox = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number)
+  const bounds = contentOf(first)
+  if (viewBox.length !== 4 || !viewBox.every(Number.isFinite) || !worthCropping(bounds, width, height)) {
+    return canvasToPng(first)
+  }
+  const cropped = croppedViewBox(
+    viewBox as [number, number, number, number],
+    width,
+    height,
+    bounds,
+    svg.getAttribute('preserveAspectRatio') || undefined,
+  )
+  svg.setAttribute('viewBox', cropped.join(' '))
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
+  const size = vectorRenderSize(bounds.width, bounds.height)
+  return canvasToPng(await renderSvg(svg, size.width, size.height))
 }
 
 async function pdfToPng(file: Blob): Promise<Blob> {
@@ -149,15 +268,37 @@ async function pdfToPng(file: Blob): Promise<Blob> {
   const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) })
   try {
     const pdf = await task.promise
-    // First page only, rendered so its longest side is the output size
+    // First page only
     const page = await pdf.getPage(1)
     const base = page.getViewport({ scale: 1 })
-    const viewport = page.getViewport({ scale: OUTPUT_SIZE / Math.max(base.width, base.height) })
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.round(viewport.width)
-    canvas.height = Math.round(viewport.height)
-    await page.render({ canvas, viewport }).promise
-    return await canvasToPng(canvas)
+    const render = async (scale: number, width: number, height: number, offsetX = 0, offsetY = 0) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const viewport = page.getViewport({ scale, offsetX, offsetY })
+      await page.render({ canvas, viewport }).promise
+      return canvas
+    }
+
+    // First pass: whole page with its longest side at VECTOR_RENDER_SIZE
+    const scale = VECTOR_RENDER_SIZE / Math.max(base.width, base.height)
+    const width = Math.round(base.width * scale)
+    const height = Math.round(base.height * scale)
+    const first = await render(scale, width, height)
+
+    // Second pass: shift and scale the page so the drawing fills the render
+    const bounds = contentOf(first)
+    if (!worthCropping(bounds, width, height)) return await canvasToPng(first)
+    const zoom = VECTOR_RENDER_SIZE / Math.max(bounds.width, bounds.height)
+    return await canvasToPng(
+      await render(
+        scale * zoom,
+        Math.round(bounds.width * zoom),
+        Math.round(bounds.height * zoom),
+        -bounds.x * zoom,
+        -bounds.y * zoom,
+      ),
+    )
   } finally {
     await task.destroy()
   }
@@ -185,26 +326,26 @@ async function tiffToPng(file: Blob): Promise<Blob> {
 }
 
 /**
- * Returns a Blob the browser can display for the given upload: the file
+ * Returns something the browser can display for the given upload: the file
  * itself for native formats, otherwise a PNG rendering of it.
  *
  * @throws Error if the format is unsupported or the file can't be decoded
  */
-export async function toLoadableBlob(file: File): Promise<Blob> {
+export async function toLoadableBlob(file: File): Promise<LoadedImport> {
   const head = new Uint8Array(await file.slice(0, 1024).arrayBuffer())
   const kind = detectImportKind(file.name, file.type, head)
 
   switch (kind) {
     case 'native':
-      return file
+      return { blob: file, vector: false }
     case 'svg':
-      return svgToPng(file, head)
+      return { blob: await svgToPng(file, head), vector: true }
     case 'pdf':
-      return pdfToPng(file)
+      return { blob: await pdfToPng(file), vector: true }
     case 'heic':
-      return heicToPng(file)
+      return { blob: await heicToPng(file), vector: false }
     case 'tiff':
-      return tiffToPng(file)
+      return { blob: await tiffToPng(file), vector: false }
     default:
       throw new Error(`Unsupported file type: ${file.type || file.name}`)
   }

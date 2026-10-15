@@ -27,7 +27,8 @@ export function LanguageSwitcher() {
   }
 
   return (
-    <DropdownMenu>
+    // Non-modal: a modal menu locks scrolling and hides the scrollbar, making the page jump
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"

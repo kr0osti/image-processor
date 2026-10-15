@@ -1,7 +1,16 @@
 /**
  * @jest-environment node
  */
-import { detectImportKind, isSupportedImport, svgIntrinsicSize, vectorRenderSize, IMPORT_ACCEPT } from '@/lib/image-import'
+import {
+  croppedViewBox,
+  detectImportKind,
+  isSupportedImport,
+  svgIntrinsicSize,
+  vectorRenderSize,
+  visibleBounds,
+  IMPORT_ACCEPT,
+  VECTOR_RENDER_SIZE,
+} from '@/lib/image-import'
 
 const bytes = (...values: number[]) => new Uint8Array([...values, ...new Array(16).fill(0)])
 const text = (value: string) => new TextEncoder().encode(value)
@@ -71,9 +80,50 @@ describe('vector sizing', () => {
     expect(svgIntrinsicSize(svg({}))).toEqual({ width: 0, height: 0 })
   })
 
-  it('renders vectors with their longest side at output size', () => {
+  it('renders vectors with their longest side at the output size', () => {
+    expect(VECTOR_RENDER_SIZE).toBe(1500)
     expect(vectorRenderSize(24, 12)).toEqual({ width: 1500, height: 750 })
     expect(vectorRenderSize(50, 100)).toEqual({ width: 750, height: 1500 })
+    expect(vectorRenderSize(624, 400)).toEqual({ width: 1500, height: 962 })
     expect(vectorRenderSize(0, 0)).toEqual({ width: 1500, height: 1500 })
   })
 })
+
+describe('vector margin cropping', () => {
+  // 10x10 RGBA image, transparent except for the given opaque pixels
+  const image = (pixels: [number, number, [number, number, number, number]][]) => {
+    const data = new Uint8ClampedArray(10 * 10 * 4)
+    for (const [x, y, rgba] of pixels) data.set(rgba, (y * 10 + x) * 4)
+    return data
+  }
+
+  it('finds the visible drawing, ignoring transparent and pure-white pixels', () => {
+    const data = image([
+      [3, 2, [0, 0, 0, 255]],
+      [6, 7, [200, 30, 30, 255]],
+      [0, 0, [255, 255, 255, 255]], // white background
+      [9, 9, [0, 0, 0, 8]], // nearly transparent
+    ])
+    expect(visibleBounds(data, 10, 10, 0)).toEqual({ x: 3, y: 2, width: 4, height: 6 })
+    expect(visibleBounds(data, 10, 10, 2)).toEqual({ x: 1, y: 0, width: 8, height: 10 })
+  })
+
+  it('returns null when nothing is visible', () => {
+    expect(visibleBounds(image([[5, 5, [255, 255, 255, 255]]]), 10, 10)).toBeNull()
+  })
+
+  it('maps pixel bounds back to a viewBox', () => {
+    // viewBox 0 0 100 50 rendered at 200x100: 2 px per unit
+    expect(croppedViewBox([0, 0, 100, 50], 200, 100, { x: 20, y: 10, width: 100, height: 40 })).toEqual([10, 5, 50, 20])
+    // Offset viewBox, like CAD exports
+    expect(croppedViewBox([-14, -30, 160, 100], 320, 200, { x: 0, y: 0, width: 160, height: 100 })).toEqual([-14, -30, 80, 50])
+  })
+
+  it('accounts for letterboxing when the aspect ratios differ', () => {
+    // viewBox 0 0 100 100 in a 200x100 render: scale 1, centred with 50 px on each side
+    expect(croppedViewBox([0, 0, 100, 100], 200, 100, { x: 50, y: 0, width: 100, height: 100 })).toEqual([0, 0, 100, 100])
+    // preserveAspectRatio="none" stretches each axis independently
+    expect(croppedViewBox([0, 0, 100, 100], 200, 100, { x: 0, y: 0, width: 100, height: 50 }, 'none')).toEqual([0, 0, 50, 50])
+  })
+})
+

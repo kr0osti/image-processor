@@ -30,6 +30,7 @@ const formats = [
   ['BMP', 'product.bmp'],
   ['TIFF', 'product.tiff'],
   ['SVG (viewBox only)', 'logo.svg'],
+  ['SVG with scripts (sanitized)', 'scripted.svg'],
   ['PDF', 'product.pdf'],
   ['Illustrator (.ai)', 'logo.ai'],
 ] as const;
@@ -54,11 +55,55 @@ test.describe('Import formats', () => {
     });
   }
 
+  test('scripts inside an imported SVG never run', async ({ page }) => {
+    await page.goto('/');
+    const title = await page.title();
+    await page.locator('input[type="file"]').setInputFiles(fixture('scripted.svg'));
+    await expect(page.getByRole('heading', { name: 'Processed Images (1)' })).toBeVisible({ timeout: 60_000 });
+    expect(await page.title()).toBe(title);
+  });
+
   test('vectors are rendered at output size, so they are never flagged as low resolution', async ({ page }) => {
     await page.goto('/');
     await page.locator('input[type="file"]').setInputFiles([fixture('logo.svg'), fixture('product.pdf')]);
     await expect(page.getByRole('heading', { name: 'Processed Images (2)' })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText('Low resolution')).toHaveCount(0);
+  });
+
+  test('vectors are rendered without their empty margins, filling the content area', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('input[type="file"]').setInputFiles(fixture('logo-margins.svg'));
+    await expect(page.getByRole('heading', { name: 'Processed Images (1)' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText('Low resolution')).toHaveCount(0);
+    // The margins are already gone, so there is nothing left to trim
+    await expect(page.locator('#trim-padding-0')).toHaveCount(0);
+
+    // The drawing spans (almost) the whole 1200 px content area inside the 150 px padding
+    const src = (await page.getByAltText('Processed image 1').getAttribute('src'))!;
+    const span = await page.evaluate(async (src) => {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      let min = img.width;
+      let max = -1;
+      for (let y = 0; y < img.height; y += 10) {
+        const row = ctx.getImageData(0, y, img.width, 1).data;
+        for (let x = 0; x < img.width; x++) {
+          if (row[x * 4] < 128) {
+            min = Math.min(min, x);
+            max = Math.max(max, x);
+          }
+        }
+      }
+      return max - min;
+    }, src);
+    expect(span).toBeGreaterThan(1100);
+    expect(span).toBeLessThanOrEqual(1200);
   });
 
   test('files that are not images are skipped with a message', async ({ page }) => {

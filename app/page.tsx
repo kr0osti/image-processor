@@ -105,7 +105,8 @@ export default function ImageProcessor() {
   const [baseUrl, setBaseUrl] = useState("https://zhik.com")
   const [useCustomBaseUrl, setUseCustomBaseUrl] = useState(false)
   const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([])
-  const [reprocessingIndex, setReprocessingIndex] = useState<number | null>(null)
+  // Id (not position) of the image being reprocessed, so removing other cards can't shift it
+  const [reprocessingId, setReprocessingId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
@@ -134,6 +135,8 @@ export default function ImageProcessor() {
   const [isDragging, setIsDragging] = useState(false)
   // Original filename for each source URL; a ref so processing started in the same event sees new entries
   const imageUrlToFilename = useRef<Map<string, string>>(new Map())
+  // Sources rendered from vectors; they can't be low resolution, so they never get the warning
+  const vectorSources = useRef<Set<string>>(new Set())
 
   const addLog = (message: string) => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -432,9 +435,11 @@ export default function ImageProcessor() {
         continue
       }
       try {
-        const blob = await toLoadableBlob(file)
+        const { blob, vector } = await toLoadableBlob(file)
         if (blob !== file) addLog(`Converted ${file.name} to PNG for processing`)
-        loaded.push({ file, url: URL.createObjectURL(blob) })
+        const url = URL.createObjectURL(blob)
+        if (vector) vectorSources.current.add(url)
+        loaded.push({ file, url })
       } catch (error: unknown) {
         addLog(`Could not import ${file.name}: ${error instanceof Error ? error.message : error}`)
         toast.error(t("toasts.importFailed", { name: file.name }))
@@ -608,7 +613,7 @@ export default function ImageProcessor() {
       ...changes,
     }
 
-    setReprocessingIndex(index)
+    setReprocessingId(target.id)
     addLog(
       `Reprocessing image ${index + 1}: white background ${options.whiteBackground ? "on" : "off"}, trim padding ${options.trimPadding ? "on" : "off"}`,
     )
@@ -629,7 +634,7 @@ export default function ImageProcessor() {
       addLog(`Error reprocessing image ${index + 1}: ${errorMessage}`)
       toast.error(t("toasts.reprocessFailed", { index: index + 1 }))
     } finally {
-      setReprocessingIndex(null)
+      setReprocessingId(null)
     }
   }
 
@@ -755,9 +760,11 @@ export default function ImageProcessor() {
         const settings = readSettingsCookie()
 
         // Determine if image has white background, unless the user forced it on or off
+        // Vectors are cropped to their drawing, which hides the transparent space they
+        // came with from edge detection, so they default to the padded white layout
         const hasWhiteBackground = resolveWhiteBackground(
           options.whiteBackground,
-          () => detectWhiteBorder(img, settings.whiteThreshold / 100),
+          () => vectorSources.current.has(imageUrl) || detectWhiteBorder(img, settings.whiteThreshold / 100),
         )
         addLog(
           `Image background ${options.whiteBackground === undefined ? "detection" : "override"}: ${hasWhiteBackground ? "White background" : "No white background"}`,
@@ -780,7 +787,8 @@ export default function ImageProcessor() {
         // Padded for white backgrounds, otherwise fit to full width/height
         const rect = computeDrawRect(source.width, source.height, hasWhiteBackground, undefined, settings.padding)
         addLog(`Drawing at ${rect.width}x${rect.height}, position: (${rect.x}, ${rect.y})`)
-        const upscale = getUpscaleFactor(source.width, source.height, rect)
+        // Vectors were rendered at a fixed size of our choosing, so enlarging them isn't a quality problem
+        const upscale = vectorSources.current.has(imageUrl) ? 1 : getUpscaleFactor(source.width, source.height, rect)
         if (isUpscaled(upscale)) {
           addLog(`Source ${source.width}x${source.height} is upscaled ${upscale.toFixed(2)}x`)
         }
@@ -1239,7 +1247,8 @@ export default function ImageProcessor() {
     )
   }
 
-  const busy = processing || reprocessingIndex !== null
+  // While any image is being (re)processed its options are locked: reprocessing uses one shared canvas
+  const busy = processing || reprocessingId !== null
   const metaFor = (imgUrl: string) => imageMetadata.find(m => m.url === imgUrl)
 
   return (
@@ -1413,7 +1422,8 @@ export default function ImageProcessor() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h2 className="text-lg font-semibold tracking-tight">{t("found.title", { count: fetchedImages.length })}</h2>
                     <div className="flex flex-wrap items-center gap-2">
-                      <DropdownMenu>
+                      {/* Non-modal: a modal menu locks scrolling and hides the scrollbar, making the page jump */}
+                      <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" className="rounded-full">
                             <Filter className="h-4 w-4" />
@@ -1614,7 +1624,7 @@ export default function ImageProcessor() {
                       alt={t("processed.imageAlt", { index: index + 1 })}
                       className="h-full w-full object-contain"
                     />
-                    {reprocessingIndex === index && (
+                    {reprocessingId === img.id && (
                       <div className="absolute inset-0 grid place-items-center bg-background/60 backdrop-blur-sm">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       </div>
@@ -1624,7 +1634,8 @@ export default function ImageProcessor() {
                       variant="secondary"
                       className="absolute right-2 top-2 h-8 w-8 rounded-full border bg-card/90 shadow-sm backdrop-blur"
                       aria-label={t("processed.remove", { index: index + 1 })}
-                      disabled={busy}
+                      // Only the card being reprocessed can't be removed; the others stay usable
+                      disabled={reprocessingId === img.id}
                       onClick={() => removeProcessedImage(img.id)}
                     >
                       <X className="h-4 w-4" />
