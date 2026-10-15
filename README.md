@@ -5,13 +5,14 @@ A powerful web application that allows you to download, process, and standardize
 ## 📋 Features
 
 - **Multiple Image Sources**: Upload local files or scrape images from webpages
+- **Many Import Formats**: PNG, JPEG/JFIF, WebP, AVIF, GIF, BMP, ICO, TIFF and HEIC/HEIF photos, plus SVG, PDF and Illustrator (`.ai`) vectors, up to 50 MB each. Vectors are rendered at output size, so they stay sharp; EPS and PSD are not supported
 - **Intelligent Processing**: Automatically resize and position images to 1500x1500px based on content
 - **Batch Processing**: Process multiple images at once with filtering by size
-- **Adjustable Layout**: A settings page sets the white-background padding (default 150px per side) and the white-detection threshold, saved per browser in a cookie
+- **Adjustable Layout**: A settings page sets the white-background padding (default 150px per side), the white-detection threshold and the PNG quality (default 80), saved per browser in a cookie
 - **Low-Resolution Warning**: Images that had to be upscaled are flagged with their source size and upscale factor
 - **Languages**: English, French, Spanish and German, picked from the browser language or the header switcher
 - **Light & Dark Themes**: Follows the system setting, with a toggle in the header
-- **Lossless PNG Output**: Processed images are saved and downloaded as PNG; the API rejects other formats
+- **Compressed PNG Output**: Processed images are always PNG (the save API rejects other formats), compressed by colour quantization; the PNG quality is set on the settings page (100 = lossless)
 - **Download Options**: Download individual images or as a ZIP archive
 - **Deleting**: The ✕ on a processed image and "Delete All Files" also delete the saved files from the server; files saved before a restart (without `UPLOAD_TOKEN_SECRET`) are left to the cleanup job
 - **CORS Handling**: Creates placeholders for images that can't be loaded due to CORS restrictions
@@ -111,7 +112,7 @@ Next.js picks up the files in `app/` automatically; `app/manifest.ts` points at 
 
 A single Next.js application:
 
-- **Browser**: images are laid out on a canvas in the browser (`app/page.tsx`, helpers in `lib/image-layout.ts`), then uploaded as 1500×1500 PNGs.
+- **Browser**: uploads are decoded in the browser (`lib/image-import.ts`: native formats as-is; SVG, PDF/AI, HEIC and TIFF rendered to PNG first), laid out on a canvas (`app/page.tsx`, helpers in `lib/image-layout.ts`), then compressed (`lib/png-compress.ts`) and uploaded as 1500×1500 PNGs.
 - **Server**: API routes save and serve the processed images, proxy remote images past CORS (with SSRF protection in `lib/ssrf.ts`: private and reserved addresses are refused both when the URL is checked and when the connection is opened, so DNS rebinding can't slip through) and scrape webpages for images (`app/actions.ts`).
 - **Background job**: a cron job started from `instrumentation.ts` deletes old files from `public/uploads`.
 

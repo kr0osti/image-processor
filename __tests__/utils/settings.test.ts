@@ -18,7 +18,7 @@ describe('parseSettings', () => {
   })
 
   it('round-trips serialized settings', () => {
-    const settings = { padding: 120, whiteThreshold: 70 }
+    const settings = { padding: 120, whiteThreshold: 70, pngQuality: 60 }
     expect(parseSettings(serializeSettings(settings))).toEqual(settings)
   })
 
@@ -32,24 +32,25 @@ describe('parseSettings', () => {
     expect(parseSettings(encodeURIComponent(JSON.stringify({ padding: 50, whiteThreshold: 'x' })))).toEqual({
       padding: 50,
       whiteThreshold: DEFAULT_SETTINGS.whiteThreshold,
+      pngQuality: DEFAULT_SETTINGS.pngQuality,
     })
   })
 })
 
 describe('sanitizeSettings', () => {
   it('clamps values into the supported range', () => {
-    expect(sanitizeSettings({ padding: -20, whiteThreshold: 200 })).toEqual({ padding: 0, whiteThreshold: 99 })
-    expect(sanitizeSettings({ padding: 5000, whiteThreshold: 10 })).toEqual({ padding: 600, whiteThreshold: 50 })
+    expect(sanitizeSettings({ padding: -20, whiteThreshold: 200, pngQuality: 0 })).toEqual({ padding: 0, whiteThreshold: 99, pngQuality: 1 })
+    expect(sanitizeSettings({ padding: 5000, whiteThreshold: 10, pngQuality: 500 })).toEqual({ padding: 600, whiteThreshold: 50, pngQuality: 100 })
   })
 
   it('rounds to whole numbers', () => {
-    expect(sanitizeSettings({ padding: 120.6, whiteThreshold: 84.4 })).toEqual({ padding: 121, whiteThreshold: 84 })
+    expect(sanitizeSettings({ padding: 120.6, whiteThreshold: 84.4, pngQuality: 79.5 })).toEqual({ padding: 121, whiteThreshold: 84, pngQuality: 80 })
   })
 })
 
 describe('getCookieValue', () => {
   it('finds the settings cookie among others', () => {
-    const value = serializeSettings({ padding: 200, whiteThreshold: 90 })
+    const value = serializeSettings({ padding: 200, whiteThreshold: 90, pngQuality: 80 })
     expect(getCookieValue(`theme=dark; ${SETTINGS_COOKIE}=${value}; other=1`, SETTINGS_COOKIE)).toBe(value)
   })
 
@@ -64,3 +65,11 @@ describe('contentSize', () => {
     expect(contentSize(0)).toBe(1500)
   })
 })
+
+describe('pngQuality', () => {
+  it('defaults to 80 and is kept from older cookies without it', () => {
+    expect(DEFAULT_SETTINGS.pngQuality).toBe(80)
+    expect(parseSettings(encodeURIComponent(JSON.stringify({ padding: 100, whiteThreshold: 85 }))).pngQuality).toBe(80)
+  })
+})
+

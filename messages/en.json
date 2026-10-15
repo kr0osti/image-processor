@@ -25,7 +25,7 @@
     },
     "upload": {
       "dropTitle": "Drag & drop images here",
-      "dropHint": "PNG, JPG, WEBP or GIF · up to 10 MB each",
+      "dropHint": "Images (PNG, JPG/JFIF, WebP, AVIF, GIF, BMP, TIFF, HEIC) or vectors (SVG, PDF, AI) · up to 50 MB each",
       "button": "Upload Images",
       "corsHint": "Uploading works with any image on your device and avoids CORS issues.",
       "uploadedFiles": "Uploaded files",
@@ -82,7 +82,9 @@
       "reprocessFailed": "Failed to reprocess image {index}",
       "filesDeleted": "{count, plural, one {Deleted # file from the server} other {Deleted # files from the server}}",
       "deleteFailed": "Couldn't delete every file from the server. The rest will be removed by the scheduled cleanup.",
-      "removeFailed": "Couldn't delete the image from the server. It will be removed by the scheduled cleanup."
+      "removeFailed": "Couldn't delete the image from the server. It will be removed by the scheduled cleanup.",
+      "importFailed": "Couldn't read {name}. The file may be damaged or in an unsupported format.",
+      "fileTooLarge": "{name} is larger than {max} MB and was skipped."
     },
     "errors": {
       "fetchFailed": "An error occurred while fetching the images: {message}",
@@ -110,6 +112,10 @@
     "slider": "{label} slider",
     "reset": "Reset to defaults",
     "save": "Save settings",
-    "saved": "Settings saved"
+    "saved": "Settings saved",
+    "outputSection": "Output",
+    "pngQuality": "PNG quality",
+    "pngQualityDescription": "Compresses each PNG to a palette of {colors} colours, keeping files small. 100 is lossless, for the sharpest gradients but the largest files.",
+    "pngQualityLossless": "Lossless: full colour, optimised but not reduced. Lower it to make files several times smaller."
   }
 }

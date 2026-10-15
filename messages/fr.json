@@ -25,7 +25,7 @@
     },
     "upload": {
       "dropTitle": "Glissez-déposez vos images ici",
-      "dropHint": "PNG, JPG, WEBP ou GIF · 10 Mo max. par fichier",
+      "dropHint": "Images (PNG, JPG/JFIF, WebP, AVIF, GIF, BMP, TIFF, HEIC) ou vectoriels (SVG, PDF, AI) · 50 Mo max. par fichier",
       "button": "Importer des images",
       "corsHint": "L'import fonctionne avec n'importe quelle image de votre appareil et évite les problèmes de CORS.",
       "uploadedFiles": "Fichiers importés",
@@ -82,7 +82,9 @@
       "reprocessFailed": "Impossible de retraiter l'image {index}",
       "filesDeleted": "{count, plural, one {# fichier supprimé du serveur} other {# fichiers supprimés du serveur}}",
       "deleteFailed": "Impossible de supprimer tous les fichiers du serveur. Les autres seront supprimés lors du nettoyage automatique.",
-      "removeFailed": "Impossible de supprimer l'image du serveur. Elle sera supprimée lors du nettoyage automatique."
+      "removeFailed": "Impossible de supprimer l'image du serveur. Elle sera supprimée lors du nettoyage automatique.",
+      "importFailed": "Impossible de lire {name}. Le fichier est peut-être endommagé ou dans un format non pris en charge.",
+      "fileTooLarge": "{name} dépasse {max} Mo et a été ignoré."
     },
     "errors": {
       "fetchFailed": "Une erreur est survenue lors de la récupération des images : {message}",
@@ -110,6 +112,10 @@
     "slider": "Curseur {label}",
     "reset": "Rétablir les valeurs par défaut",
     "save": "Enregistrer",
-    "saved": "Paramètres enregistrés"
+    "saved": "Paramètres enregistrés",
+    "outputSection": "Sortie",
+    "pngQuality": "Qualité PNG",
+    "pngQualityDescription": "Compresse chaque PNG sur une palette de {colors} couleurs pour garder des fichiers légers. 100 est sans perte : dégradés les plus nets, mais fichiers les plus lourds.",
+    "pngQualityLossless": "Sans perte : toutes les couleurs, optimisé mais non réduit. Baissez la valeur pour des fichiers plusieurs fois plus légers."
   }
 }

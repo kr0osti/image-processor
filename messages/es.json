@@ -25,7 +25,7 @@
     },
     "upload": {
       "dropTitle": "Arrastra y suelta las imágenes aquí",
-      "dropHint": "PNG, JPG, WEBP o GIF · hasta 10 MB cada una",
+      "dropHint": "Imágenes (PNG, JPG/JFIF, WebP, AVIF, GIF, BMP, TIFF, HEIC) o vectores (SVG, PDF, AI) · hasta 50 MB cada una",
       "button": "Subir imágenes",
       "corsHint": "Subir archivos funciona con cualquier imagen de tu dispositivo y evita problemas de CORS.",
       "uploadedFiles": "Archivos subidos",
@@ -82,7 +82,9 @@
       "reprocessFailed": "No se pudo volver a procesar la imagen {index}",
       "filesDeleted": "{count, plural, one {Se eliminó # archivo del servidor} other {Se eliminaron # archivos del servidor}}",
       "deleteFailed": "No se pudieron eliminar todos los archivos del servidor. El resto se eliminará en la limpieza programada.",
-      "removeFailed": "No se pudo eliminar la imagen del servidor. Se eliminará en la limpieza programada."
+      "removeFailed": "No se pudo eliminar la imagen del servidor. Se eliminará en la limpieza programada.",
+      "importFailed": "No se pudo leer {name}. Puede que el archivo esté dañado o en un formato no compatible.",
+      "fileTooLarge": "{name} supera los {max} MB y se ha omitido."
     },
     "errors": {
       "fetchFailed": "Se produjo un error al obtener las imágenes: {message}",
@@ -110,6 +112,10 @@
     "slider": "Control deslizante de {label}",
     "reset": "Restablecer valores predeterminados",
     "save": "Guardar ajustes",
-    "saved": "Ajustes guardados"
+    "saved": "Ajustes guardados",
+    "outputSection": "Salida",
+    "pngQuality": "Calidad PNG",
+    "pngQualityDescription": "Comprime cada PNG a una paleta de {colors} colores para que los archivos sean ligeros. 100 es sin pérdida: degradados más nítidos, pero archivos más grandes.",
+    "pngQualityLossless": "Sin pérdida: todos los colores, optimizado pero no reducido. Bájalo para obtener archivos varias veces más pequeños."
   }
 }

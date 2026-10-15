@@ -25,7 +25,7 @@
     },
     "upload": {
       "dropTitle": "Bilder hierher ziehen und ablegen",
-      "dropHint": "PNG, JPG, WEBP oder GIF · bis zu 10 MB pro Datei",
+      "dropHint": "Bilder (PNG, JPG/JFIF, WebP, AVIF, GIF, BMP, TIFF, HEIC) oder Vektoren (SVG, PDF, AI) · bis zu 50 MB pro Datei",
       "button": "Bilder hochladen",
       "corsHint": "Hochladen funktioniert mit jedem Bild auf Ihrem Gerät und vermeidet CORS-Probleme.",
       "uploadedFiles": "Hochgeladene Dateien",
@@ -82,7 +82,9 @@
       "reprocessFailed": "Bild {index} konnte nicht erneut bearbeitet werden",
       "filesDeleted": "{count, plural, one {# Datei vom Server gelöscht} other {# Dateien vom Server gelöscht}}",
       "deleteFailed": "Nicht alle Dateien konnten vom Server gelöscht werden. Die übrigen werden bei der geplanten Bereinigung entfernt.",
-      "removeFailed": "Das Bild konnte nicht vom Server gelöscht werden. Es wird bei der geplanten Bereinigung entfernt."
+      "removeFailed": "Das Bild konnte nicht vom Server gelöscht werden. Es wird bei der geplanten Bereinigung entfernt.",
+      "importFailed": "{name} konnte nicht gelesen werden. Die Datei ist möglicherweise beschädigt oder hat ein nicht unterstütztes Format.",
+      "fileTooLarge": "{name} ist größer als {max} MB und wurde übersprungen."
     },
     "errors": {
       "fetchFailed": "Beim Abrufen der Bilder ist ein Fehler aufgetreten: {message}",
@@ -110,6 +112,10 @@
     "slider": "Schieberegler {label}",
     "reset": "Auf Standardwerte zurücksetzen",
     "save": "Einstellungen speichern",
-    "saved": "Einstellungen gespeichert"
+    "saved": "Einstellungen gespeichert",
+    "outputSection": "Ausgabe",
+    "pngQuality": "PNG-Qualität",
+    "pngQualityDescription": "Komprimiert jedes PNG auf eine Palette mit {colors} Farben, damit die Dateien klein bleiben. 100 ist verlustfrei: schärfste Verläufe, aber größte Dateien.",
+    "pngQualityLossless": "Verlustfrei: alle Farben, optimiert, aber nicht reduziert. Senken Sie den Wert für mehrfach kleinere Dateien."
   }
 }

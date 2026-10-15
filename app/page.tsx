@@ -26,6 +26,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { useTranslations } from "next-intl"
 import { readSettingsCookie } from "@/lib/settings"
+import { IMPORT_ACCEPT, isSupportedImport, toLoadableBlob } from "@/lib/image-import"
+import { blobToDataUrl, encodeCompressedPng } from "@/lib/png-compress"
 import {
   BOUNDS_SCAN_SIZE,
   computeDrawRect,
@@ -84,6 +86,9 @@ interface SavedImage {
   filename: string | null;
   deleteToken: string | null;
 }
+
+// Largest file accepted for import; bigger files would strain the browser while decoding
+const MAX_IMPORT_BYTES = 50 * 1024 * 1024
 
 interface ProcessOptions {
   // Force the white-background layout on or off instead of auto-detecting it
@@ -392,9 +397,7 @@ export default function ImageProcessor() {
     setIsDragging(false);
 
     const allFiles = Array.from(e.dataTransfer.files);
-    const imageFiles = allFiles.filter((file) => 
-      file.type.startsWith('image/')
-    );
+    const imageFiles = allFiles.filter(isSupportedImport);
 
     if (imageFiles.length === 0) {
       addLog('No image files found in dropped files');
@@ -417,14 +420,35 @@ export default function ImageProcessor() {
     addUploadedFiles(imageFiles);
   }
 
-  // Queue new uploads for processing; their results are appended to the existing ones
-  const addUploadedFiles = (files: File[]) => {
-    const fileUrls = files.map((file) => URL.createObjectURL(file))
-    addLog(`Created object URLs for ${fileUrls.length} files`)
+  // Queue new uploads for processing; their results are appended to the existing ones.
+  // Formats browsers can't display (SVG, PDF/AI, HEIC, TIFF) are rendered to PNG first.
+  const addUploadedFiles = async (files: File[]) => {
+    setProcessing(true)
+    const loaded: { file: File; url: string }[] = []
+    for (const file of files) {
+      if (file.size > MAX_IMPORT_BYTES) {
+        addLog(`Skipped ${file.name}: ${(file.size / 1024 / 1024).toFixed(1)} MB is over the limit`)
+        toast.error(t("toasts.fileTooLarge", { name: file.name, max: MAX_IMPORT_BYTES / 1024 / 1024 }))
+        continue
+      }
+      try {
+        const blob = await toLoadableBlob(file)
+        if (blob !== file) addLog(`Converted ${file.name} to PNG for processing`)
+        loaded.push({ file, url: URL.createObjectURL(blob) })
+      } catch (error: unknown) {
+        addLog(`Could not import ${file.name}: ${error instanceof Error ? error.message : error}`)
+        toast.error(t("toasts.importFailed", { name: file.name }))
+      }
+    }
+    if (loaded.length === 0) {
+      setProcessing(false)
+      return
+    }
+    addLog(`Created object URLs for ${loaded.length} files`)
 
-    setUploadedFiles((prev) => [...prev, ...files.map((file, index) => ({ file, url: fileUrls[index] }))])
-    files.forEach((file, index) => imageUrlToFilename.current.set(fileUrls[index], file.name))
-    processImages(fileUrls)
+    setUploadedFiles((prev) => [...prev, ...loaded])
+    loaded.forEach(({ file, url }) => imageUrlToFilename.current.set(url, file.name))
+    processImages(loaded.map(({ url }) => url))
   }
 
   /**
@@ -703,7 +727,7 @@ export default function ImageProcessor() {
         resolve(null)
       }, 15000) // 15 seconds timeout
 
-      img.onload = () => {
+      img.onload = async () => {
         clearTimeout(timeoutId)
         addLog(`Image loaded: ${img.width}x${img.height}`)
         const canvas = canvasRef.current
@@ -762,8 +786,16 @@ export default function ImageProcessor() {
         }
         ctx.drawImage(img, source.x, source.y, source.width, source.height, rect.x, rect.y, rect.width, rect.height)
 
-        // Convert canvas to data URL
-        const dataUrl = canvas.toDataURL("image/png")
+        // Encode as a compressed PNG at the quality chosen in Settings
+        let dataUrl: string
+        try {
+          const png = await encodeCompressedPng(ctx.getImageData(0, 0, canvas.width, canvas.height), settings.pngQuality)
+          dataUrl = await blobToDataUrl(png)
+          addLog(`Encoded PNG at quality ${settings.pngQuality}: ${Math.round(png.size / 1024)} KB`)
+        } catch (error: unknown) {
+          addLog(`PNG compression failed, saving uncompressed: ${error instanceof Error ? error.message : error}`)
+          dataUrl = canvas.toDataURL("image/png")
+        }
         addLog("Image processing completed successfully")
         resolve({
           dataUrl,
@@ -1278,7 +1310,7 @@ export default function ImageProcessor() {
                   type="file"
                   ref={fileInputRef}
                   className="hidden"
-                  accept="image/*"
+                  accept={IMPORT_ACCEPT}
                   multiple
                   onChange={handleFileUpload}
                 />

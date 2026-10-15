@@ -15,6 +15,7 @@ import {
   type ProcessingSettings,
 } from '@/lib/settings'
 import { OUTPUT_SIZE } from '@/lib/image-layout'
+import { LOSSLESS_QUALITY, paletteSizeForQuality } from '@/lib/png-compress'
 
 interface FieldProps {
   id: string
@@ -81,9 +82,9 @@ export function SettingsForm({ initial }: { initial: ProcessingSettings }) {
   const update = (key: keyof ProcessingSettings) => (value: number) =>
     setSettings((prev) => ({ ...prev, [key]: value }))
 
-  const dirty = settings.padding !== saved.padding || settings.whiteThreshold !== saved.whiteThreshold
-  const isDefault =
-    settings.padding === DEFAULT_SETTINGS.padding && settings.whiteThreshold === DEFAULT_SETTINGS.whiteThreshold
+  const keys = Object.keys(DEFAULT_SETTINGS) as (keyof ProcessingSettings)[]
+  const dirty = keys.some((key) => settings[key] !== saved[key])
+  const isDefault = keys.every((key) => settings[key] === DEFAULT_SETTINGS[key])
 
   const save = (event: React.FormEvent) => {
     event.preventDefault()
@@ -143,6 +144,25 @@ export function SettingsForm({ initial }: { initial: ProcessingSettings }) {
             limits={SETTINGS_LIMITS.whiteThreshold}
             onChange={update('whiteThreshold')}
             description={t('thresholdDescription')}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+        <h2 className="text-base font-semibold">{t('outputSection')}</h2>
+        <div className="mt-6">
+          <RangeField
+            id="png-quality"
+            label={t('pngQuality')}
+            unit=""
+            value={settings.pngQuality}
+            limits={SETTINGS_LIMITS.pngQuality}
+            onChange={update('pngQuality')}
+            description={
+              preview.pngQuality >= LOSSLESS_QUALITY
+                ? t('pngQualityLossless')
+                : t('pngQualityDescription', { colors: paletteSizeForQuality(preview.pngQuality) })
+            }
           />
         </div>
       </section>
