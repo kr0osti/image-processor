@@ -78,6 +78,7 @@ Customize the application by setting these environment variables in your `.env` 
 | `CLEANUP_API_KEY` | API key for `/api/cleanup` (**required**: the endpoint returns 500 when it is unset) | (none) |
 | `CLEANUP_CRON_SCHEDULE` | Cron schedule for the cleanup job; files older than one interval are deleted | */30 * * * * |
 | `NEXT_PUBLIC_DEBUG` | Enable debug logging | false |
+| `PROCESS_API_KEY` | Enables `POST /api/process` (server-side processing); callers send it as `Authorization: Bearer …`. Unset = endpoint disabled | (none) |
 | `UPLOAD_TOKEN_SECRET` | Key for signing delete tokens. Optional; without it a random key is used, so tokens issued before a restart stop working (those files are still removed by the cleanup job) | (random per start) |
 | `ALLOWED_DEV_ORIGINS` | Comma-separated hosts allowed to open `next dev` from another machine (e.g. a LAN IP) | (none) |
 
@@ -120,12 +121,46 @@ A single Next.js application:
 
 | Endpoint | Method | Description | Rate Limit |
 |----------|--------|-------------|------------|
-| `/api/images` | POST | Save a processed image; returns its `filename` and a `deleteToken` | 300 req/min |
+| `/api/process` | POST | Process an image on the server (see below); requires `PROCESS_API_KEY` | 30 req/min |
+| `/api/images` | POST | Save an image already processed by the web UI (JSON data URL); returns its `filename` and a `deleteToken` | 300 req/min |
 | `/api/images` | DELETE | Delete saved images: `{ files: [{ filename, token }] }`, each with the token returned when it was saved | 30 req/min |
 | `/api/proxy` | GET | Proxy for fetching images to avoid CORS issues | 500 req/min |
 | `/api/serve-image` | GET | Serve processed images from the server | — |
 | `/api/cleanup` | GET | Delete uploads older than `maxAge` minutes (default 60); requires `?key=<CLEANUP_API_KEY>` | 5 req/min |
 | `/api/healthcheck` | GET | Check if the application is running | 30 req/min |
+
+### Processing API
+
+`POST /api/process` does on the server what the web UI does in the browser, so images can be processed from scripts. It is off until `PROCESS_API_KEY` is set.
+
+Send the image as a multipart `file`, as a `url` (multipart or JSON; fetched with the same SSRF protection as the proxy), or as the raw request body with an `image/*` content type. Accepted formats: PNG, JPEG, WebP, AVIF, GIF, TIFF and SVG, up to 25 MB. HEIC and PDF/AI only work in the web UI.
+
+Parameters can be sent as form/JSON fields or in the query string (fields win); missing ones use the settings-page defaults:
+
+| Parameter | Values | Default |
+|-----------|--------|---------|
+| `padding` | 0–600 px per side for white-background images | 150 |
+| `whiteThreshold` | 50–99 % of sampled pixels that must be white | 85 |
+| `pngQuality` | 1–100; 100 is lossless | 80 |
+| `whiteBackground` | `auto`, `on` or `off` | `auto` |
+| `trimPadding` | `true` / `false`: crop the source's white margin first | `false` |
+| `response` | `png` (the image) or `json` (store it and return its URL) | `png` |
+
+```bash
+# Get the processed PNG back directly
+curl -H "Authorization: Bearer $PROCESS_API_KEY" \
+  -F file=@shoe.jpg -F padding=100 -F pngQuality=90 \
+  https://images.example.com/api/process -o shoe-processed.png
+
+# Process a remote image and store the result
+curl -H "Authorization: Bearer $PROCESS_API_KEY" -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/logo.svg", "response": "json"}' \
+  https://images.example.com/api/process
+# → { "url": "/api/serve-image?file=logo-processed.png", "filename": "...", "deleteToken": "...",
+#     "whiteBackground": true, "upscale": 1, "sourceWidth": 1500, "sourceHeight": 862, ... }
+```
+
+PNG responses carry the details in headers (`X-White-Background`, `X-Trimmed`, `X-Upscale`, `X-Source-Size`). Stored results are removed by the cleanup job like other uploads, or earlier with `DELETE /api/images` and the returned `deleteToken`.
 
 ## 🧪 Testing
 

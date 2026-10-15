@@ -8,6 +8,11 @@ const nextConfig = {
   allowedDevOrigins: process.env.ALLOWED_DEV_ORIGINS ? process.env.ALLOWED_DEV_ORIGINS.split(',') : [],
   // Increase API limits for handling large images
   serverExternalPackages: ['sharp'],
+  experimental: {
+    // Request bodies are buffered for proxy.ts (which runs on /api/*) and cut off at 10 MB by
+    // default. 40 MB covers a 25 MB upload to /api/process and the largest /api/images data URL.
+    proxyClientMaxBodySize: '40mb',
+  },
   images: {
     remotePatterns: [
       {

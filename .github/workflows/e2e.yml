@@ -52,6 +52,8 @@ jobs:
         run: pnpm test:e2e
         env:
           CLEANUP_API_KEY: "test-api-key-for-ci"
+          # Enables POST /api/process for e2e/api-process.spec.ts
+          PROCESS_API_KEY: "test-process-key-for-ci"
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}

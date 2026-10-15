@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
-import crypto from 'crypto';
 import { existsSync } from 'fs';
 import { cleanupOldUploads } from '../../utils/cleanup';
 import { createRateLimiter } from '../../utils/rate-limit.js';
 import { createDeleteToken, isValidDeleteToken } from '../../utils/delete-token.js';
+import { processedFilename } from '../../utils/processed-filename.js';
 
 // Run cleanup on server start (will run when this file is first imported)
 (async () => {
@@ -195,17 +195,8 @@ async function handleRequest(request) {
     const uploadsDir = await ensureUploadsDir();
     const fileExt = ALLOWED_IMAGE_TYPES[matches[1].toLowerCase()];
 
-    // Generate filename based on original filename if provided
-    let filename;
-    if (typeof originalFilename === 'string' && originalFilename) {
-      // Sanitize the filename (no leading dots) and append -processed before the extension
-      const sanitized = originalFilename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '');
-      const nameWithoutExt = sanitized.replace(/\.[^/.]+$/, '').slice(0, 200) || 'image';
-      filename = `${nameWithoutExt}-processed.${fileExt}`;
-    } else {
-      // Fallback to random filename if no original filename provided
-      filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
-    }
+    // Named after the original file when known, otherwise random
+    const filename = processedFilename(originalFilename, fileExt);
     
     const filePath = path.join(uploadsDir, filename);
 
@@ -247,93 +238,12 @@ async function handleRequest(request) {
       }, { status: 500 });
     }
   }
-  // Handle form data
-  else if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
-    const formData = await request.formData();
-
-    // Extract image data from the request
-    const imageUrls = formData.getAll('imageUrls');
-    const files = formData.getAll('files');
-    const webUrl = formData.get('webUrl');
-
-    // Process the images (placeholder implementation)
-    const processedImages = [];
-
-    if (imageUrls && imageUrls.length > 0) {
-      // Process image URLs
-      for (const url of imageUrls) {
-        if (url) {
-          processedImages.push({
-            originalUrl: url,
-            processedUrl: url,
-            success: true
-          });
-        }
-      }
-    }
-
-    if (files && files.length > 0) {
-      console.log(`Processing ${files.length} uploaded files`);
-      // Ensure the uploads directory exists once before processing all files
-      const uploadsDir = await ensureUploadsDir();
-
-      // Process uploaded files concurrently
-      const filePromises = files.map(async (file) => {
-        if (!file || typeof file !== 'object') return null;
-
-        // Only accept allowed image types within the size limit
-        const fileExt = ALLOWED_IMAGE_TYPES[(file.type || '').toLowerCase()];
-        if (!fileExt || file.size > MAX_IMAGE_BYTES) {
-          return {
-            originalName: file.name,
-            processedUrl: null,
-            success: false,
-            message: !fileExt ? 'Unsupported file type' : 'File too large'
-          };
-        }
-
-        // Save the file to the uploads directory
-        const filename = `${crypto.randomBytes(16).toString('hex')}.${fileExt}`;
-        const filePath = path.join(uploadsDir, filename);
-        const publicUrl = `/uploads/${filename}`;
-
-        // Get file data as ArrayBuffer and save it
-        const fileData = await file.arrayBuffer();
-        await writeFile(filePath, Buffer.from(fileData));
-
-        return {
-          originalName: file.name,
-          processedUrl: publicUrl,
-          success: true
-        };
-      });
-
-      const results = await Promise.all(filePromises);
-      processedImages.push(...results.filter(Boolean));
-    }
-
-    if (webUrl) {
-      processedImages.push({
-        originalUrl: webUrl,
-        processedUrl: null,
-        success: false,
-        message: 'Web scraping implementation pending'
-      });
-    }
-
-
-    return NextResponse.json({
-      success: true,
-      message: 'Images processed successfully',
-      images: processedImages
-    });
-  }
   // Handle unsupported content type
   else {
     return NextResponse.json({
       success: false,
       message: 'Unsupported content type',
-      error: `Content type '${contentType}' is not supported. Use 'application/json' or 'multipart/form-data'.`
+      error: `Content type '${contentType}' is not supported. This endpoint saves already processed images sent as JSON; to process an image on the server, use POST /api/process.`
     }, { status: 400 });
   }
 }
