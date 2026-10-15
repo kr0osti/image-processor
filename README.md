@@ -79,6 +79,7 @@ Customize the application by setting these environment variables in your `.env` 
 | `CLEANUP_CRON_SCHEDULE` | Cron schedule for the cleanup job; files older than one interval are deleted | */30 * * * * |
 | `NEXT_PUBLIC_DEBUG` | Enable debug logging | false |
 | `PROCESS_API_KEY` | Enables `POST /api/process` (server-side processing); callers send it as `Authorization: Bearer …`. Unset = endpoint disabled | (none) |
+| `UPLOAD_CHUNK_CHARS` | Optional cap on the base64 characters per chunk of a chunked upload, e.g. to fit a reverse proxy's header buffer | (fits Node's header limit) |
 | `UPLOAD_TOKEN_SECRET` | Key for signing delete tokens. Optional; without it a random key is used, so tokens issued before a restart stop working (those files are still removed by the cleanup job) | (random per start) |
 | `ALLOWED_DEV_ORIGINS` | Comma-separated hosts allowed to open `next dev` from another machine (e.g. a LAN IP) | (none) |
 
@@ -122,6 +123,10 @@ A single Next.js application:
 | Endpoint | Method | Description | Rate Limit |
 |----------|--------|-------------|------------|
 | `/api/process` | POST | Process an image on the server (see below); requires `PROCESS_API_KEY` | 30 req/min |
+| `/api/process/uploads` | POST | Start a chunked upload, for clients that can't send a request body (see below) | 30 req/min |
+| `/api/process/uploads/{id}/chunks/{n}` | POST | Add chunk `n` of a chunked upload | 6000 req/min |
+| `/api/process/uploads/{id}/process` | POST | Process a completed chunked upload; returns JSON with the PNG as base64 | shared with `/api/process` |
+| `/api/process/uploads/{id}/cancel` | POST | Abandon a chunked upload | — |
 | `/api/images` | POST | Save an image already processed by the web UI (JSON data URL); returns its `filename` and a `deleteToken` | 300 req/min |
 | `/api/images` | DELETE | Delete saved images: `{ files: [{ filename, token }] }`, each with the token returned when it was saved | 30 req/min |
 | `/api/proxy` | GET | Proxy for fetching images to avoid CORS issues | 500 req/min |
@@ -161,6 +166,18 @@ curl -H "Authorization: Bearer $PROCESS_API_KEY" -H "Content-Type: application/j
 ```
 
 PNG responses carry the details in headers (`X-White-Background`, `X-Trimmed`, `X-Upscale`, `X-Source-Size`). Stored results are removed by the cleanup job like other uploads, or earlier with `DELETE /api/images` and the returned `deleteToken`.
+
+### Chunked uploads
+
+Some clients can only set a URL and headers, not a request body: the Affinity scripting SDK is one. They upload the image as base64 pieces in a header, then ask for it to be processed. All steps need `Authorization: Bearer <PROCESS_API_KEY>`.
+
+1. `POST /api/process/uploads` with `X-Upload-Size: <bytes>` and optionally `X-Upload-Name: <file name>`. The answer gives the upload `id` and `chunkChars`, the most base64 characters one chunk may carry.
+2. `POST /api/process/uploads/{id}/chunks/{n}` for `n` = 0, 1, 2… with the next piece of the base64 text in `X-Chunk-Data`. Every piece but the last must have a length that is a multiple of 4. Resending the last chunk after a lost response is harmless.
+3. `POST /api/process/uploads/{id}/process?padding=100&…` with the same parameters as `/api/process`, plus `store=true` to also save the result. The answer is JSON with the PNG as base64 in `png`, its `filename`, the details (`whiteBackground`, `upscale`, …) and, when stored, `url` and `deleteToken`.
+
+Uploads are kept in memory: 25 MB per image, 200 MB and 32 uploads in total, dropped after 10 idle minutes or with `POST /api/process/uploads/{id}/cancel`.
+
+The chunk size follows Node's header limit: 12 KB by default. The Docker Compose files raise the limit to 64 KB (`--max-http-header-size=65536` in `NODE_OPTIONS`), so a 4 MB image takes about 90 requests instead of 360. A reverse proxy in front must accept headers that large too, e.g. `large_client_header_buffers 4 64k;` for nginx; otherwise lower `UPLOAD_CHUNK_CHARS` to match it.
 
 ## 🧪 Testing
 

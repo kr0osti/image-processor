@@ -9,7 +9,7 @@ services:
       - .env
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=4096}
+      - NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=4096 --max-http-header-size=65536}
       - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG:-false}
       - HOSTNAME=${HOSTNAME:-0.0.0.0}
       - NEXT_PUBLIC_SITE_NAME=${NEXT_PUBLIC_SITE_NAME}
