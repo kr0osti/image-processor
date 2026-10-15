@@ -185,9 +185,10 @@ jobs:
           id=$(echo "$start" | jq -r .id)
           chunk_chars=$(echo "$start" | jq -r .chunkChars)
           [ "$chunk_chars" = "61440" ] || { echo "✗ chunkChars is $chunk_chars, expected 61440"; docker logs "$CONTAINER_ID"; exit 1; }
-          base64 -w0 "$image" | fold -w "$chunk_chars" > chunks.txt
+          # One chunk per line; the trailing newline lets read see the last one
+          { base64 -w0 "$image" | fold -w "$chunk_chars"; echo; } > chunks.txt
           index=0
-          while read -r piece; do
+          while read -r piece && [ -n "$piece" ]; do
             status=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "$auth" -H "X-Chunk-Data: $piece" "$base/$id/chunks/$index")
             [ "$status" = "200" ] || { echo "✗ chunk $index failed (HTTP $status)"; docker logs "$CONTAINER_ID"; exit 1; }
             index=$((index + 1))
