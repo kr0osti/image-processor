@@ -139,3 +139,32 @@ jobs:
           # Cleanup
           rm -rf test-uploads
           echo "✓ Docker image permission tests passed"
+
+      # sharp is a native module: make sure it loads and processes images in the Alpine image
+      - name: Test the processing API in the image
+        if: env.SHOULD_BUILD == 'true'
+        run: |
+          IMAGE_TAG=$(echo "${{ steps.meta-app.outputs.tags }}" | head -n1)
+          CONTAINER_ID=$(docker run -d -p 3005:3000 \
+            -e PROCESS_API_KEY=ci-process-key -e CLEANUP_API_KEY=ci-cleanup-key \
+            "$IMAGE_TAG")
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:3005/api/healthcheck > /dev/null 2>&1 && break
+            [ "$i" -eq 30 ] && { echo "✗ App did not start"; docker logs "$CONTAINER_ID"; exit 1; }
+            sleep 2
+          done
+
+          for fixture in product.jfif logo.svg; do
+            status=$(curl -s -o out.png -w '%{http_code}' \
+              -H "Authorization: Bearer ci-process-key" \
+              -F "file=@e2e/fixtures/import/$fixture" \
+              http://localhost:3005/api/process)
+            if [ "$status" != "200" ] || [ "$(head -c 8 out.png | od -An -tx1 | tr -d ' \n')" != "89504e470d0a1a0a" ]; then
+              echo "✗ /api/process failed for $fixture (HTTP $status)"; cat out.png; docker logs "$CONTAINER_ID"; exit 1
+            fi
+            # A PNG's width and height are bytes 17-24 of the file
+            size=$(head -c 24 out.png | tail -c 8 | od -An -tu1 | awk '{print $3*256+$4 "x" $7*256+$8}')
+            [ "$size" = "1500x1500" ] || { echo "✗ Unexpected size $size for $fixture"; exit 1; }
+            echo "✓ /api/process returned a 1500x1500 PNG for $fixture"
+          done
+          docker rm -f "$CONTAINER_ID" > /dev/null
