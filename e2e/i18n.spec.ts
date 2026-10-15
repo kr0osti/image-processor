@@ -10,6 +10,19 @@ test.describe('Languages', () => {
     await context.close();
   });
 
+  test('opening the language menu does not lock scrolling or shift the page', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 500 });
+    await page.goto('/');
+    const width = () => page.evaluate(() => document.documentElement.clientWidth);
+    const before = await width();
+
+    await page.getByRole('button', { name: /Language/ }).click();
+    await expect(page.getByRole('menuitem', { name: 'Français' })).toBeVisible();
+    // Radix marks the body when it locks scrolling (and hides the scrollbar)
+    await expect(page.locator('body')).not.toHaveAttribute('data-scroll-locked', /.*/);
+    expect(await width()).toBe(before);
+  });
+
   test('switching language persists in a cookie', async ({ page, context }) => {
     await page.goto('/');
     await page.getByRole('button', { name: /Language/ }).click();

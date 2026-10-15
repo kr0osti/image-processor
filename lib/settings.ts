@@ -8,6 +8,8 @@ export interface ProcessingSettings {
   padding: number
   // Percentage of sampled pixels that must be white for the image to count as white-background
   whiteThreshold: number
+  // PNG output quality, 1-100: 100 is lossless, lower values use fewer colours for smaller files
+  pngQuality: number
 }
 
 export const SETTINGS_COOKIE = 'image-processor-settings'
@@ -16,12 +18,14 @@ const ONE_YEAR = 60 * 60 * 24 * 365
 export const DEFAULT_SETTINGS: ProcessingSettings = {
   padding: WHITE_BACKGROUND_PADDING,
   whiteThreshold: Math.round(WHITE_RATIO_THRESHOLD * 100),
+  pngQuality: 80,
 }
 
 export const SETTINGS_LIMITS = {
   // At 600px per side the content area is still 300px wide
   padding: { min: 0, max: 600, step: 10 },
   whiteThreshold: { min: 50, max: 99, step: 1 },
+  pngQuality: { min: 1, max: 100, step: 1 },
 } as const
 
 const clamp = (value: unknown, { min, max }: { min: number; max: number }, fallback: number): number => {
@@ -36,6 +40,7 @@ export const sanitizeSettings = (data: unknown): ProcessingSettings => {
   return {
     padding: clamp(values.padding, SETTINGS_LIMITS.padding, DEFAULT_SETTINGS.padding),
     whiteThreshold: clamp(values.whiteThreshold, SETTINGS_LIMITS.whiteThreshold, DEFAULT_SETTINGS.whiteThreshold),
+    pngQuality: clamp(values.pngQuality, SETTINGS_LIMITS.pngQuality, DEFAULT_SETTINGS.pngQuality),
   }
 }
 

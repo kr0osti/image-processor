@@ -26,6 +26,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { useTranslations } from "next-intl"
 import { readSettingsCookie } from "@/lib/settings"
+import { IMPORT_ACCEPT, isSupportedImport, toLoadableBlob } from "@/lib/image-import"
+import { blobToDataUrl, encodeCompressedPng } from "@/lib/png-compress"
 import {
   BOUNDS_SCAN_SIZE,
   computeDrawRect,
@@ -85,6 +87,9 @@ interface SavedImage {
   deleteToken: string | null;
 }
 
+// Largest file accepted for import; bigger files would strain the browser while decoding
+const MAX_IMPORT_BYTES = 50 * 1024 * 1024
+
 interface ProcessOptions {
   // Force the white-background layout on or off instead of auto-detecting it
   whiteBackground?: boolean;
@@ -100,7 +105,8 @@ export default function ImageProcessor() {
   const [baseUrl, setBaseUrl] = useState("https://zhik.com")
   const [useCustomBaseUrl, setUseCustomBaseUrl] = useState(false)
   const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([])
-  const [reprocessingIndex, setReprocessingIndex] = useState<number | null>(null)
+  // Id (not position) of the image being reprocessed, so removing other cards can't shift it
+  const [reprocessingId, setReprocessingId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState("")
@@ -129,6 +135,8 @@ export default function ImageProcessor() {
   const [isDragging, setIsDragging] = useState(false)
   // Original filename for each source URL; a ref so processing started in the same event sees new entries
   const imageUrlToFilename = useRef<Map<string, string>>(new Map())
+  // Sources rendered from vectors; they can't be low resolution, so they never get the warning
+  const vectorSources = useRef<Set<string>>(new Set())
 
   const addLog = (message: string) => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -392,9 +400,7 @@ export default function ImageProcessor() {
     setIsDragging(false);
 
     const allFiles = Array.from(e.dataTransfer.files);
-    const imageFiles = allFiles.filter((file) => 
-      file.type.startsWith('image/')
-    );
+    const imageFiles = allFiles.filter(isSupportedImport);
 
     if (imageFiles.length === 0) {
       addLog('No image files found in dropped files');
@@ -417,62 +423,37 @@ export default function ImageProcessor() {
     addUploadedFiles(imageFiles);
   }
 
-  // Queue new uploads for processing; their results are appended to the existing ones
-  const addUploadedFiles = (files: File[]) => {
-    const fileUrls = files.map((file) => URL.createObjectURL(file))
-    addLog(`Created object URLs for ${fileUrls.length} files`)
-
-    setUploadedFiles((prev) => [...prev, ...files.map((file, index) => ({ file, url: fileUrls[index] }))])
-    files.forEach((file, index) => imageUrlToFilename.current.set(fileUrls[index], file.name))
-    processImages(fileUrls)
-  }
-
-  /**
-   * Compresses an image data URL to reduce its size before sending to the server
-   *
-   * @param {string} dataUrl - The data URL of the image to compress
-   * @returns {Promise<string>} A promise that resolves to the compressed data URL
-   */
-  const compressImageDataUrl = (dataUrl: string): Promise<string> => {
-    if (!isBrowser) return Promise.resolve(dataUrl)
-
-    return new Promise((resolve) => {
-      const img = new Image()
-      img.onload = () => {
-        // Create a canvas to draw the compressed image
-        const canvas = document.createElement('canvas')
-
-        // Set max dimensions to reduce size while maintaining quality
-        const maxDimension = 1500
-        const scale = Math.min(1, maxDimension / Math.max(img.width, img.height))
-        canvas.width = img.width * scale
-        canvas.height = img.height * scale
-
-        // Get context and draw image
-        const ctx = canvas.getContext('2d', { willReadFrequently: true })
-        if (!ctx) {
-          addLog("Failed to get canvas context for compression")
-          resolve(dataUrl) // Return original if compression fails
-          return
-        }
-
-        // Draw image with smoothing for better quality
-        ctx.imageSmoothingEnabled = true
-        ctx.imageSmoothingQuality = 'high'
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-
-        // Convert to data URL with reduced quality (0.8 is a good balance)
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8)
-        resolve(compressedDataUrl)
+  // Queue new uploads for processing; their results are appended to the existing ones.
+  // Formats browsers can't display (SVG, PDF/AI, HEIC, TIFF) are rendered to PNG first.
+  const addUploadedFiles = async (files: File[]) => {
+    setProcessing(true)
+    const loaded: { file: File; url: string }[] = []
+    for (const file of files) {
+      if (file.size > MAX_IMPORT_BYTES) {
+        addLog(`Skipped ${file.name}: ${(file.size / 1024 / 1024).toFixed(1)} MB is over the limit`)
+        toast.error(t("toasts.fileTooLarge", { name: file.name, max: MAX_IMPORT_BYTES / 1024 / 1024 }))
+        continue
       }
-
-      img.onerror = () => {
-        addLog("Failed to load image for compression")
-        resolve(dataUrl) // Return original if compression fails
+      try {
+        const { blob, vector } = await toLoadableBlob(file)
+        if (blob !== file) addLog(`Converted ${file.name} to PNG for processing`)
+        const url = URL.createObjectURL(blob)
+        if (vector) vectorSources.current.add(url)
+        loaded.push({ file, url })
+      } catch (error: unknown) {
+        addLog(`Could not import ${file.name}: ${error instanceof Error ? error.message : error}`)
+        toast.error(t("toasts.importFailed", { name: file.name }))
       }
+    }
+    if (loaded.length === 0) {
+      setProcessing(false)
+      return
+    }
+    addLog(`Created object URLs for ${loaded.length} files`)
 
-      img.src = dataUrl
-    })
+    setUploadedFiles((prev) => [...prev, ...loaded])
+    loaded.forEach(({ file, url }) => imageUrlToFilename.current.set(url, file.name))
+    processImages(loaded.map(({ url }) => url))
   }
 
   /**
@@ -560,15 +541,14 @@ export default function ImageProcessor() {
 
     if (!processedImage) return null
 
-    // Compress the image data before sending to server
-    const compressedImage = await compressImageDataUrl(processedImage)
-    addLog(`Compressed image from ${Math.round(processedImage.length / 1024)} KB to ${Math.round(compressedImage.length / 1024)} KB`)
+    // Saved as the canvas produced it: a lossless 1500x1500 PNG
+    addLog(`Saving PNG (${Math.round(processedImage.length / 1024)} KB)`)
 
     // Get original filename if available
     const originalFilename = imageUrlToFilename.current.get(imageUrl)
 
     // Convert data URL to real URL
-    const saved = await convertDataUrlToRealUrl(compressedImage, originalFilename)
+    const saved = await convertDataUrlToRealUrl(processedImage, originalFilename)
     if (saved === null) return null
 
     return {
@@ -633,7 +613,7 @@ export default function ImageProcessor() {
       ...changes,
     }
 
-    setReprocessingIndex(index)
+    setReprocessingId(target.id)
     addLog(
       `Reprocessing image ${index + 1}: white background ${options.whiteBackground ? "on" : "off"}, trim padding ${options.trimPadding ? "on" : "off"}`,
     )
@@ -654,7 +634,7 @@ export default function ImageProcessor() {
       addLog(`Error reprocessing image ${index + 1}: ${errorMessage}`)
       toast.error(t("toasts.reprocessFailed", { index: index + 1 }))
     } finally {
-      setReprocessingIndex(null)
+      setReprocessingId(null)
     }
   }
 
@@ -752,7 +732,7 @@ export default function ImageProcessor() {
         resolve(null)
       }, 15000) // 15 seconds timeout
 
-      img.onload = () => {
+      img.onload = async () => {
         clearTimeout(timeoutId)
         addLog(`Image loaded: ${img.width}x${img.height}`)
         const canvas = canvasRef.current
@@ -780,9 +760,11 @@ export default function ImageProcessor() {
         const settings = readSettingsCookie()
 
         // Determine if image has white background, unless the user forced it on or off
+        // Vectors are cropped to their drawing, which hides the transparent space they
+        // came with from edge detection, so they default to the padded white layout
         const hasWhiteBackground = resolveWhiteBackground(
           options.whiteBackground,
-          () => detectWhiteBorder(img, settings.whiteThreshold / 100),
+          () => vectorSources.current.has(imageUrl) || detectWhiteBorder(img, settings.whiteThreshold / 100),
         )
         addLog(
           `Image background ${options.whiteBackground === undefined ? "detection" : "override"}: ${hasWhiteBackground ? "White background" : "No white background"}`,
@@ -805,14 +787,23 @@ export default function ImageProcessor() {
         // Padded for white backgrounds, otherwise fit to full width/height
         const rect = computeDrawRect(source.width, source.height, hasWhiteBackground, undefined, settings.padding)
         addLog(`Drawing at ${rect.width}x${rect.height}, position: (${rect.x}, ${rect.y})`)
-        const upscale = getUpscaleFactor(source.width, source.height, rect)
+        // Vectors were rendered at a fixed size of our choosing, so enlarging them isn't a quality problem
+        const upscale = vectorSources.current.has(imageUrl) ? 1 : getUpscaleFactor(source.width, source.height, rect)
         if (isUpscaled(upscale)) {
           addLog(`Source ${source.width}x${source.height} is upscaled ${upscale.toFixed(2)}x`)
         }
         ctx.drawImage(img, source.x, source.y, source.width, source.height, rect.x, rect.y, rect.width, rect.height)
 
-        // Convert canvas to data URL
-        const dataUrl = canvas.toDataURL("image/png")
+        // Encode as a compressed PNG at the quality chosen in Settings
+        let dataUrl: string
+        try {
+          const png = await encodeCompressedPng(ctx.getImageData(0, 0, canvas.width, canvas.height), settings.pngQuality)
+          dataUrl = await blobToDataUrl(png)
+          addLog(`Encoded PNG at quality ${settings.pngQuality}: ${Math.round(png.size / 1024)} KB`)
+        } catch (error: unknown) {
+          addLog(`PNG compression failed, saving uncompressed: ${error instanceof Error ? error.message : error}`)
+          dataUrl = canvas.toDataURL("image/png")
+        }
         addLog("Image processing completed successfully")
         resolve({
           dataUrl,
@@ -1256,7 +1247,8 @@ export default function ImageProcessor() {
     )
   }
 
-  const busy = processing || reprocessingIndex !== null
+  // While any image is being (re)processed its options are locked: reprocessing uses one shared canvas
+  const busy = processing || reprocessingId !== null
   const metaFor = (imgUrl: string) => imageMetadata.find(m => m.url === imgUrl)
 
   return (
@@ -1327,7 +1319,7 @@ export default function ImageProcessor() {
                   type="file"
                   ref={fileInputRef}
                   className="hidden"
-                  accept="image/*"
+                  accept={IMPORT_ACCEPT}
                   multiple
                   onChange={handleFileUpload}
                 />
@@ -1430,7 +1422,8 @@ export default function ImageProcessor() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h2 className="text-lg font-semibold tracking-tight">{t("found.title", { count: fetchedImages.length })}</h2>
                     <div className="flex flex-wrap items-center gap-2">
-                      <DropdownMenu>
+                      {/* Non-modal: a modal menu locks scrolling and hides the scrollbar, making the page jump */}
+                      <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" className="rounded-full">
                             <Filter className="h-4 w-4" />
@@ -1631,7 +1624,7 @@ export default function ImageProcessor() {
                       alt={t("processed.imageAlt", { index: index + 1 })}
                       className="h-full w-full object-contain"
                     />
-                    {reprocessingIndex === index && (
+                    {reprocessingId === img.id && (
                       <div className="absolute inset-0 grid place-items-center bg-background/60 backdrop-blur-sm">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                       </div>
@@ -1641,7 +1634,8 @@ export default function ImageProcessor() {
                       variant="secondary"
                       className="absolute right-2 top-2 h-8 w-8 rounded-full border bg-card/90 shadow-sm backdrop-blur"
                       aria-label={t("processed.remove", { index: index + 1 })}
-                      disabled={busy}
+                      // Only the card being reprocessed can't be removed; the others stay usable
+                      disabled={reprocessingId === img.id}
                       onClick={() => removeProcessedImage(img.id)}
                     >
                       <X className="h-4 w-4" />

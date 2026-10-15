@@ -14,7 +14,7 @@ test.describe('Settings', () => {
     await expect(page.getByText('Settings saved')).toBeVisible();
 
     const cookie = (await context.cookies()).find((c) => c.name === 'image-processor-settings');
-    expect(JSON.parse(decodeURIComponent(cookie!.value))).toEqual({ padding: 120, whiteThreshold: 70 });
+    expect(JSON.parse(decodeURIComponent(cookie!.value))).toEqual({ padding: 120, whiteThreshold: 70, pngQuality: 80 });
 
     // Rendered from the cookie on the server
     await page.reload();
@@ -79,3 +79,58 @@ test.describe('Low-resolution warning', () => {
     await expect(page.getByText('Low resolution')).toHaveCount(0);
   });
 });
+
+test.describe('PNG quality', () => {
+  // A photo-like image (gradient plus noise), where palette compression matters
+  async function photoPng(page: import('@playwright/test').Page): Promise<Buffer> {
+    const base64 = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 600;
+      const ctx = canvas.getContext('2d')!;
+      const image = ctx.createImageData(800, 600);
+      let seed = 7;
+      for (let i = 0; i < image.data.length; i += 4) {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        const x = (i / 4) % 800;
+        const y = Math.floor(i / 4 / 800);
+        image.data.set([(x * 255) / 800 + (seed % 30), (y * 255) / 600 + (seed % 20), 140, 255], i);
+      }
+      ctx.putImageData(image, 0, 0);
+      return canvas.toDataURL('image/png').split(',')[1];
+    });
+    return Buffer.from(base64, 'base64');
+  }
+
+  async function savedSize(page: import('@playwright/test').Page, quality: number, name: string): Promise<number> {
+    await page.goto('/settings');
+    await page.getByLabel('PNG quality', { exact: true }).fill(String(quality));
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    await expect(page.getByText('Settings saved')).toBeVisible();
+
+    await page.goto('/');
+    await page.locator('input[type="file"]').setInputFiles({ name, mimeType: 'image/png', buffer: await photoPng(page) });
+    await expect(page.getByRole('heading', { name: 'Processed Images (1)' })).toBeVisible({ timeout: 60_000 });
+    const src = (await page.getByAltText('Processed image 1').getAttribute('src'))!;
+    const response = await page.request.get(src);
+    expect(response.headers()['content-type']).toBe('image/png');
+    return (await response.body()).length;
+  }
+
+  test('lower quality saves smaller PNGs', async ({ page }) => {
+    const id = Date.now();
+    const lossless = await savedSize(page, 100, `q100-${id}.png`);
+    const compressed = await savedSize(page, 20, `q20-${id}.png`);
+    expect(compressed).toBeLessThan(lossless * 0.6);
+  });
+
+  test('describes the palette size and lossless mode', async ({ page }) => {
+    await page.goto('/settings');
+    const field = page.getByLabel('PNG quality', { exact: true });
+    await field.fill('50');
+    await expect(page.getByText(/palette of 128 colours/)).toBeVisible();
+    await field.fill('100');
+    await expect(page.getByText(/Lossless/)).toBeVisible();
+  });
+});
+
